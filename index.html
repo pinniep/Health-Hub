@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health Hub</title>
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#33506b;--ink-soft:#5f7589;--paper:#f4ede6;--card:#fdfaf6;--line:#e4d9cd;
+    --blue:#6b8cae;--blue-deep:#4a6b8a;--blue-soft:#dde7f0;
+    --peach:#cf6f43;--peach-soft:#f7dcc9;--stone:#94897f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--paper);line-height:1.45;min-height:100vh;}
+  .wrap{max-width:520px;margin:0 auto;padding:30px 18px 50px;}
+  header{margin-bottom:24px;}
+  h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.7rem;letter-spacing:-.02em;}
+  header p{color:var(--ink-soft);font-size:.9rem;margin-top:4px;}
+  .tile{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;margin-bottom:12px;text-decoration:none;color:var(--ink);transition:transform .08s,box-shadow .15s;}
+  .tile:active{transform:scale(.99);}
+  .tile .ic{flex:none;}
+  .tile .mid{flex:1;min-width:0;}
+  .tile .nm{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:1.1rem;}
+  .tile .ds{font-size:.82rem;color:var(--ink-soft);margin-top:2px;}
+  .tile .arr{color:var(--stone);font-size:1.2rem;flex:none;}
+  .tile.soon{opacity:.6;cursor:default;}
+  .badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;background:var(--peach-soft);color:var(--peach);padding:2px 7px;border-radius:5px;margin-left:7px;vertical-align:1px;}
+  footer{margin-top:26px;font-size:.76rem;color:var(--stone);line-height:1.6;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Health Hub</h1>
+    <p>Your training, fuel and recovery — one home.</p>
+  </header>
+
+  <a class="tile" href="strength.html">
+    <span class="ic">
+      <svg viewBox="0 0 100 100" width="50" height="50" role="img" aria-label="Strength"><rect width="100" height="100" rx="24" fill="#4a6b8a"/><g fill="#f7dcc9"><rect x="40" y="46" width="20" height="8" rx="4"/><rect x="31" y="34" width="10" height="32" rx="3"/><rect x="59" y="34" width="10" height="32" rx="3"/><rect x="22" y="40" width="8" height="20" rx="3"/><rect x="70" y="40" width="8" height="20" rx="3"/></g></svg>
+    </span>
+    <span class="mid"><span class="nm">Strength Log</span><span class="ds">Log lifts, track progress, muscle map</span></span>
+    <span class="arr">›</span>
+  </a>
+
+  <a class="tile" href="food.html">
+    <span class="ic">
+      <svg viewBox="0 0 100 100" width="50" height="50" role="img" aria-label="Food"><rect width="100" height="100" rx="24" fill="#f7dcc9"/><path d="M26 50 a24 24 0 0 0 48 0 Z" fill="#4a6b8a"/><rect x="24" y="46" width="52" height="6" rx="3" fill="#4a6b8a"/><path d="M50 26 C44 32 44 40 50 44 C56 40 56 32 50 26 Z" fill="#cf6f43"/></svg>
+    </span>
+    <span class="mid"><span class="nm">Food Log</span><span class="ds">Meals, macros and fuel for the day</span></span>
+    <span class="arr">›</span>
+  </a>
+
+  <div class="tile soon">
+    <span class="ic">
+      <svg viewBox="0 0 100 100" width="50" height="50" role="img" aria-label="Dashboard"><rect width="100" height="100" rx="24" fill="#4a6b8a"/><g fill="#f7dcc9"><rect x="26" y="54" width="11" height="20" rx="2"/><rect x="44" y="42" width="11" height="32" rx="2"/><rect x="62" y="32" width="11" height="42" rx="2"/></g><circle cx="31.5" cy="40" r="4" fill="#cf6f43"/></svg>
+    </span>
+    <span class="mid"><span class="nm">Dashboard <span class="badge">coming soon</span></span><span class="ds">Fuel, training, mood &amp; cycle — daily and weekly</span></span>
+  </div>
+
+  <footer>One address, shared data. Log in any app — it all lines up by date.</footer>
+</div>
+</body>
+</html>

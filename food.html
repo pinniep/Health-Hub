@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Strong &amp; fuelled</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-stone-100">
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect } = React;
+
+/* ============ storage (localStorage; shared on the same origin) ============ */
+const lget = (key, fb) => { try { const v = localStorage.getItem(key); return v == null ? fb : JSON.parse(v); } catch { return fb; } };
+const lset = (key, v) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) { console.error(e); } };
+
+/* Shared daily check-in record, co-owned with the strength app.
+   CONTRACT: always re-read fresh, update only this date's own fields, write back. Never overwrite the whole object from a cached copy. */
+const CHECKINS = "sl:checkins";
+const mergeCheckin = (date, patch) => {
+  const all = lget(CHECKINS, {});            // fresh read every time
+  all[date] = { ...(all[date] || {}), ...patch }; // only this date's fields
+  lset(CHECKINS, all);
+  return all;
+};
+
+/* Training day is detected from the strength app's data — no manual toggle. Treat missing keys as "not trained", never assume shape. */
+const isTrainingDay = (date) => {
+  const entries = lget("sl:entries", []);
+  if (Array.isArray(entries) && entries.some((e) => e && e.dt === date)) return true;
+  const acts = lget("sl:activities", {});
+  const a = acts && acts[date];
+  return Array.isArray(a) && a.length > 0;
+};
+
+/* ============ dates ============ */
+const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const todayKey = () => fmt(new Date());
+const addDays = (k, n) => { const d = new Date(k); d.setDate(d.getDate() + n); return fmt(d); };
+const daysBetween = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
+const weekDatesOffset = (off) => { const o = []; for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - off * 7 - i); o.push(fmt(d)); } return o; };
+const shortDay = (k) => new Date(k).toLocaleDateString("en-AU", { weekday: "short" });
+const shortDate = (k) => new Date(k).toLocaleDateString("en-AU", { day: "numeric", month: "short" });
+const niceDate = (k) => new Date(k).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+
+/* ============ inline icons (no dependency) ============ */
+const ip = ({ size = 16, className = "" } = {}) => ({ xmlns: "http://www.w3.org/2000/svg", width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round", className });
+const Plus = (p) => <svg {...ip(p)}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>;
+const Minus = (p) => <svg {...ip(p)}><line x1="5" y1="12" x2="19" y2="12" /></svg>;
+const Trash2 = (p) => <svg {...ip(p)}><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>;
+const Check = (p) => <svg {...ip(p)}><polyline points="20 6 9 17 4 12" /></svg>;
+const X = (p) => <svg {...ip(p)}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+const Activity = (p) => <svg {...ip(p)}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>;
+const Flame = (p) => <svg {...ip(p)}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z" /></svg>;
+const Heart = (p) => <svg {...ip(p)}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>;
+const Droplet = (p) => <svg {...ip(p)}><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" /></svg>;
+const CalendarDays = (p) => <svg {...ip(p)}><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>;
+const UtensilsCrossed = (p) => <svg {...ip(p)}><path d="M3 2v7a2 2 0 0 0 2 2 2 2 0 0 0 2-2V2" /><path d="M5 11v11" /><path d="M19 2v20" /><path d="M19 9c2 0 3-1.5 3-4s-1-3-3-3" /></svg>;
+const Pencil = (p) => <svg {...ip(p)}><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>;
+const ChevronDown = (p) => <svg {...ip(p)}><polyline points="6 9 12 15 18 9" /></svg>;
+const ChevronUp = (p) => <svg {...ip(p)}><polyline points="18 15 12 9 6 15" /></svg>;
+const ChevronLeft = (p) => <svg {...ip(p)}><polyline points="15 18 9 12 15 6" /></svg>;
+const ChevronRight = (p) => <svg {...ip(p)}><polyline points="9 18 15 12 9 6" /></svg>;
+const Gear = (p) => <svg {...ip(p)}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>;
+
+/* ============ food data ============ */
+const FOODS = [
+  { name: "Chicken breast (raw)", k: 106, p: 23, c: 0, f: 1.5, fe: 0.7, vd: 0 },
+  { name: "Pork mince (raw)", k: 220, p: 18, c: 0, f: 16, fe: 1.0, vd: 0.7 },
+  { name: "Egg, whole", k: 143, p: 13, c: 1, f: 10, fe: 1.8, vd: 2 },
+  { name: "Egg white", k: 52, p: 11, c: 0.7, f: 0.2, fe: 0.1, vd: 0 },
+  { name: "Firm tofu", k: 144, p: 17, c: 3, f: 9, fe: 2.7, vd: 0 },
+  { name: "Prawns (raw)", k: 99, p: 24, c: 0, f: 0.3, fe: 0.5, vd: 0 },
+  { name: "Salmon (raw)", k: 208, p: 20, c: 0, f: 13, fe: 0.8, vd: 11 },
+  { name: "Sardines (canned)", k: 208, p: 25, c: 0, f: 11, fe: 2.9, vd: 4.8 },
+  { name: "Mussels (cooked)", k: 172, p: 24, c: 7, f: 4.5, fe: 6.7, vd: 0 },
+  { name: "Jasmine rice (cooked)", k: 130, p: 2.7, c: 28, f: 0.3, fe: 0.2, vd: 0 },
+  { name: "Riceberry rice (cooked)", k: 135, p: 3, c: 28, f: 1, fe: 0.5, vd: 0 },
+  { name: "Rice noodles (cooked)", k: 108, p: 2, c: 25, f: 0.2, fe: 0.2, vd: 0 },
+  { name: "Rolled oats (dry)", k: 379, p: 13, c: 67, f: 7, fe: 4.7, vd: 0 },
+  { name: "Sweet potato (raw)", k: 86, p: 1.6, c: 20, f: 0.1, fe: 0.6, vd: 0 },
+  { name: "Banana", k: 89, p: 1.1, c: 23, f: 0.3, fe: 0.3, vd: 0 },
+  { name: "Apple", k: 52, p: 0.3, c: 14, f: 0.2, fe: 0.1, vd: 0 },
+  { name: "Mixed berries", k: 50, p: 1, c: 12, f: 0.3, fe: 0.4, vd: 0 },
+  { name: "Broccoli", k: 34, p: 2.8, c: 7, f: 0.4, fe: 0.7, vd: 0 },
+  { name: "Pak boong (morning glory)", k: 19, p: 2.6, c: 3, f: 0.2, fe: 1.7, vd: 0 },
+  { name: "Bok choy / Asian greens", k: 13, p: 1.5, c: 2, f: 0.2, fe: 0.8, vd: 0 },
+  { name: "Spinach", k: 23, p: 2.9, c: 3.6, f: 0.4, fe: 2.7, vd: 0 },
+  { name: "Carrot", k: 41, p: 0.9, c: 10, f: 0.2, fe: 0.3, vd: 0 },
+  { name: "Capsicum", k: 31, p: 1, c: 6, f: 0.3, fe: 0.4, vd: 0 },
+  { name: "Onion", k: 40, p: 1.1, c: 9, f: 0.1, fe: 0.2, vd: 0 },
+  { name: "Garlic", k: 149, p: 6, c: 33, f: 0.5, fe: 1.7, vd: 0 },
+  { name: "Chilli", k: 40, p: 2, c: 9, f: 0.4, fe: 1, vd: 0 },
+  { name: "Peanut butter", k: 588, p: 25, c: 20, f: 50, fe: 1.9, vd: 0 },
+  { name: "Chia seeds", k: 486, p: 17, c: 42, f: 31, fe: 7.7, vd: 0 },
+  { name: "Flaxseed meal", k: 534, p: 18, c: 29, f: 42, fe: 5.7, vd: 0 },
+  { name: "High-protein yoghurt", k: 60, p: 10, c: 4, f: 0.2, fe: 0, vd: 0 },
+  { name: "Whey protein powder", k: 380, p: 80, c: 8, f: 5, fe: 0, vd: 0 },
+  { name: "Almond milk (unsweetened)", k: 13, p: 0.5, c: 0.3, f: 1.1, fe: 0.3, vd: 0 },
+  { name: "Olive oil", k: 884, p: 0, c: 0, f: 100, fe: 0, vd: 0 },
+  { name: "Fish sauce", k: 35, p: 5, c: 4, f: 0, fe: 0.7, vd: 0 },
+  { name: "Coconut milk", k: 230, p: 2.3, c: 6, f: 24, fe: 1.6, vd: 0 },
+];
+const NUT_FIELDS = [["k", "kcal"], ["p", "Protein g"], ["c", "Carbs g"], ["f", "Fat g"], ["fe", "Iron mg"], ["vd", "Vit D µg"]];
+
+/* mood vocabulary matches the strength app's `feeling`: Rough / OK / Good / Strong ("—" = unset) */
+const MOODS = [
+  { key: "Rough", label: "Rough", sel: "bg-stone-300 text-stone-800", bar: "bg-stone-400" },
+  { key: "OK", label: "OK", sel: "bg-stone-200 text-stone-700", bar: "bg-stone-300" },
+  { key: "Good", label: "Good", sel: "bg-violet-200 text-violet-900", bar: "bg-violet-400" },
+  { key: "Strong", label: "Strong", sel: "bg-amber-200 text-amber-900", bar: "bg-amber-400" },
+];
+const moodBar = (key) => (MOODS.find((m) => m.key === key) || {}).bar;
+const ENERGY = ["Low", "Medium", "High"]; // matches strength app's `energy`
+
+function EnergyBars({ level, onBleed }) {
+  const n = level === "High" ? 3 : level === "Medium" ? 2 : level === "Low" ? 1 : 0;
+  if (!n) return null;
+  const heights = ["h-1.5", "h-2", "h-2.5"];
+  const fill = onBleed ? "bg-white" : "bg-violet-600";
+  return (
+    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 flex items-end gap-0.5">
+      {heights.slice(0, n).map((h, i) => <span key={i} className={`w-1 ${h} rounded-sm ${fill}`} />)}
+    </span>
+  );
+}
+
+const blankIng = () => ({ name: "", g: "", k: "", p: "", c: "", f: "", fe: "", vd: "", price: "" });
+const normIng = (i) => i.g != null
+  ? { name: i.name || "", g: i.g, k: +i.k || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, vd: +i.vd || 0, price: i.price || "" }
+  : { name: i.name || "", g: 100, k: +(i.k ?? i.kcal) || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, vd: +i.vd || 0, price: "" };
+
+const calc = (r) => {
+  const s = r.servings || 1;
+  const t = { kcal: 0, p: 0, c: 0, f: 0, vd: 0, fe: 0, cost: 0 };
+  (r.ing || []).forEach((i) => {
+    const factor = i.g != null ? (+i.g || 0) / 100 : 1;
+    t.kcal += (+(i.k ?? i.kcal) || 0) * factor;
+    t.p += (+i.p || 0) * factor; t.c += (+i.c || 0) * factor; t.f += (+i.f || 0) * factor;
+    t.vd += (+i.vd || 0) * factor; t.fe += (+i.fe || 0) * factor;
+    t.cost += (+i.price || 0) * (+i.g || 0) / 1000;
+  });
+  const o = {}; for (const k in t) o[k] = t[k] / s; return o;
+};
+
+const DEFAULT_MEALS = [
+  { id: "m1", name: "Breakfast bowl", servings: 1, steps: "", ing: [
+    { name: "High-protein yoghurt", g: 170, k: 60, p: 10, c: 4, f: 0.2, fe: 0, vd: 0 },
+    { name: "Whey protein powder", g: 30, k: 380, p: 80, c: 8, f: 5, fe: 0, vd: 0 },
+    { name: "Mixed berries", g: 40, k: 50, p: 1, c: 12, f: 0.3, fe: 0.4, vd: 0 },
+    { name: "Apple", g: 50, k: 52, p: 0.3, c: 14, f: 0.2, fe: 0.1, vd: 0 },
+    { name: "Chia seeds", g: 7, k: 486, p: 17, c: 42, f: 31, fe: 7.7, vd: 0 },
+    { name: "Flaxseed meal", g: 5, k: 534, p: 18, c: 29, f: 42, fe: 5.7, vd: 0 },
+  ] },
+  { id: "m2", name: "Thai lunch — chicken, rice & veg", servings: 1, steps: "", ing: [
+    { name: "Chicken breast (raw)", g: 200, k: 106, p: 23, c: 0, f: 1.5, fe: 0.7, vd: 0 },
+    { name: "Jasmine rice (cooked)", g: 120, k: 130, p: 2.7, c: 28, f: 0.3, fe: 0.2, vd: 0 },
+    { name: "Bok choy / Asian greens", g: 150, k: 13, p: 1.5, c: 2, f: 0.2, fe: 0.8, vd: 0 },
+    { name: "Olive oil", g: 8, k: 884, p: 0, c: 0, f: 100, fe: 0, vd: 0 },
+  ] },
+];
+const DEFAULT_SETTINGS = { restTarget: 1900, trainTarget: 2100, proteinTarget: 125, currency: "$", cycleLength: 26 };
+
+function cyclePhase(day) {
+  if (day == null) return null;
+  if (day <= 5) return { name: "Menstrual", tip: "Energy may dip — lighter sessions are completely fine." };
+  if (day <= 13) return { name: "Follicular", tip: "Energy often rising — a good window for harder lifts." };
+  if (day <= 16) return { name: "Around ovulation", tip: "Often your strongest, highest-energy days." };
+  return { name: "Luteal", tip: "Appetite and cravings often climb — extra carbs or a snack help." };
+}
+
+function LabeledNum({ label, value, onChange, w = "" }) {
+  return (
+    <div className={w}>
+      <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-0.5">{label}</label>
+      <input value={value} onChange={(e) => onChange(e.target.value)} type="number" className="w-full px-2 py-1.5 rounded-lg border border-stone-200 text-sm" />
+    </div>
+  );
+}
+
+/* ============ App ============ */
+function App() {
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState("today");
+  const [meals, setMeals] = useState(DEFAULT_MEALS);
+  const [customFoods, setCustomFoods] = useState([]);
+  const [dayCache, setDayCache] = useState({});
+  const [viewDate, setViewDate] = useState(todayKey());
+  const [checkins, setCheckins] = useState({});
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [showSettings, setShowSettings] = useState(false);
+
+  useEffect(() => {
+    setMeals(lget("food:meal-library", DEFAULT_MEALS));
+    setCustomFoods(lget("food:custom-foods", []));
+    setSettings({ ...DEFAULT_SETTINGS, ...lget("food:settings", DEFAULT_SETTINGS) });
+    setCheckins(lget(CHECKINS, {}));
+    const t = todayKey();
+    setDayCache({ [t]: lget("food:log:" + t, { entries: [] }) });
+    setLoading(false);
+  }, []);
+
+  const log = dayCache[viewDate] || { entries: [] };
+  const saveLog = (n) => { setDayCache({ ...dayCache, [viewDate]: n }); lset("food:log:" + viewDate, n); };
+  const goToDate = (date) => {
+    if (date > todayKey()) return;
+    if (dayCache[date] === undefined) setDayCache((prev) => ({ ...prev, [date]: lget("food:log:" + date, { entries: [] }) }));
+    setViewDate(date);
+  };
+  const saveMeals = (n) => { setMeals(n); lset("food:meal-library", n); };
+  const saveCustomFoods = (n) => { setCustomFoods(n); lset("food:custom-foods", n); };
+  const saveSettings = (n) => { setSettings(n); lset("food:settings", n); };
+  /* merge-on-save into the shared record, then refresh local state */
+  const saveCheckin = (date, patch) => { const all = mergeCheckin(date, patch); setCheckins({ ...all }); };
+
+  const mergedFoods = (() => {
+    const map = new Map();
+    FOODS.forEach((f) => map.set(f.name, { ...f, source: "builtin" }));
+    customFoods.forEach((f) => map.set(f.name, { ...f, source: FOODS.some((b) => b.name === f.name) ? "edited" : "custom" }));
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  })();
+
+  /* cycle derived from shared check-ins where bleed === "Bleeding" */
+  const bleedDays = Object.keys(checkins).filter((d) => checkins[d] && checkins[d].bleed === "Bleeding").sort();
+  let lastStart = null, prev = null;
+  for (const d of bleedDays) { if (prev === null || daysBetween(prev, d) > 3) lastStart = d; prev = d; }
+  let cycleDay = null;
+  if (lastStart && daysBetween(lastStart, viewDate) >= 0) cycleDay = daysBetween(lastStart, viewDate) + 1;
+  const phase = cyclePhase(cycleDay);
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-stone-500">Loading…</div>;
+
+  return (
+    <div className="min-h-screen bg-stone-100 text-stone-800" style={{ fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
+      <div className="max-w-xl mx-auto px-4 pb-12 pt-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-medium text-violet-900 flex items-center gap-2"><Activity size={22} className="text-violet-500" /> Strong &amp; fuelled</h1>
+            <p className="text-sm text-stone-500">Muscle first — never under-fuelled.</p>
+          </div>
+          <button onClick={() => setShowSettings(true)} className="p-2 rounded-xl hover:bg-stone-200" aria-label="Settings"><Gear size={20} className="text-stone-500" /></button>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-stone-200 p-1 flex mb-4">
+          {[["today", Flame, "Today"], ["week", CalendarDays, "Week"], ["meals", UtensilsCrossed, "Meals"], ["cycle", Heart, "Cycle"]].map(([id, Icon, label]) => (
+            <button key={id} onClick={() => setTab(id)} className={`flex-1 py-2 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 ${tab === id ? "bg-violet-100 text-violet-700" : "text-stone-500"}`}>
+              <Icon size={16} /> {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "today" && <Today log={log} saveLog={saveLog} meals={meals} settings={settings} phase={phase} cycleDay={cycleDay} viewDate={viewDate} goToDate={goToDate} checkins={checkins} saveCheckin={saveCheckin} />}
+        {tab === "week" && <Week settings={settings} goToDate={goToDate} setTab={setTab} />}
+        {tab === "meals" && <Meals meals={meals} saveMeals={saveMeals} log={log} saveLog={saveLog} settings={settings} foods={mergedFoods} customFoods={customFoods} saveCustomFoods={saveCustomFoods} />}
+        {tab === "cycle" && <Cycle checkins={checkins} saveCheckin={saveCheckin} dateK={todayKey()} settings={settings} />}
+      </div>
+
+      {showSettings && <SettingsModal settings={settings} saveSettings={saveSettings} onClose={() => setShowSettings(false)} />}
+    </div>
+  );
+}
+
+/* ============ TODAY ============ */
+function Today({ log, saveLog, meals, settings, phase, cycleDay, viewDate, goToDate, checkins, saveCheckin }) {
+  const isToday = viewDate === todayKey();
+  const training = isTrainingDay(viewDate);
+  const ck = checkins[viewDate] || {};
+  const setEnergy = (k) => saveCheckin(viewDate, { energy: ck.energy === k ? "—" : k });
+  const setMood = (k) => saveCheckin(viewDate, { feeling: ck.feeling === k ? "—" : k });
+
+  const totals = log.entries.reduce((a, e) => ({
+    kcal: a.kcal + e.kcal * e.qty, p: a.p + e.p * e.qty, c: a.c + e.c * e.qty,
+    f: a.f + e.f * e.qty, vd: a.vd + (e.vd || 0) * e.qty, fe: a.fe + (e.fe || 0) * e.qty,
+  }), { kcal: 0, p: 0, c: 0, f: 0, vd: 0, fe: 0 });
+  const target = training ? settings.trainTarget : settings.restTarget;
+  const kcalPct = target ? totals.kcal / target : 0;
+  const proPct = settings.proteinTarget ? totals.p / settings.proteinTarget : 0;
+
+  let fuel;
+  if (kcalPct < 0.8) fuel = { cls: "bg-amber-50 border-amber-200 text-amber-900", msg: "Under-fuelled so far — add a snack or a bigger portion." };
+  else if (kcalPct <= 1.15) fuel = { cls: "bg-violet-50 border-violet-200 text-violet-900", msg: "Well fuelled. This is the zone." };
+  else fuel = { cls: "bg-stone-50 border-stone-200 text-stone-700", msg: "Plenty in the tank today — balance it over the week." };
+
+  const add = (m) => { const ps = calc(m); saveLog({ ...log, entries: [...log.entries, { name: m.name, ...ps, qty: 1, uid: Date.now() + Math.random() }] }); };
+  const setQty = (uid, d) => saveLog({ ...log, entries: log.entries.map((e) => e.uid === uid ? { ...e, qty: Math.max(0.5, e.qty + d) } : e) });
+  const remove = (uid) => saveLog({ ...log, entries: log.entries.filter((e) => e.uid !== uid) });
+
+  const Bar = ({ pct, color }) => <div className="h-2 rounded-full bg-stone-200 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }} /></div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-stone-200 p-2 flex items-center justify-between">
+        <button onClick={() => goToDate(addDays(viewDate, -1))} className="p-2 rounded-xl hover:bg-stone-100"><ChevronLeft size={16} /></button>
+        <div className="text-center">
+          <p className="text-sm font-medium">{isToday ? "Today" : niceDate(viewDate)}</p>
+          {!isToday && <button onClick={() => goToDate(todayKey())} className="text-xs text-violet-600">jump to today</button>}
+        </div>
+        <button onClick={() => !isToday && goToDate(addDays(viewDate, 1))} disabled={isToday} className={`p-2 rounded-xl hover:bg-stone-100 ${isToday ? "opacity-30" : ""}`}><ChevronRight size={16} /></button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 px-4 py-2.5 text-xs text-stone-500 flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full ${training ? "bg-violet-500" : "bg-stone-300"}`} />
+        {training ? "Training day — detected from your strength log, target lifted" : "Rest day — no workout logged for this date yet"}
+      </div>
+
+      <div className={`rounded-2xl border p-4 ${fuel.cls}`}>
+        <p className="text-sm font-medium">{fuel.msg}</p>
+        {training && <p className="text-xs mt-1 opacity-80">Training day — aim a little higher, mostly from carbs.</p>}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-4">
+        <div>
+          <div className="flex justify-between text-sm mb-1"><span className="text-stone-500">Calories in</span><span className="font-medium">{Math.round(totals.kcal)} / {target}</span></div>
+          <Bar pct={kcalPct} color={kcalPct < 0.8 ? "bg-amber-300" : "bg-violet-400"} />
+        </div>
+        <div>
+          <div className="flex justify-between text-sm mb-1"><span className="text-stone-500">Protein</span><span className="font-medium">{Math.round(totals.p)} / {settings.proteinTarget} g</span></div>
+          <Bar pct={proPct} color={proPct < 0.85 ? "bg-amber-300" : "bg-violet-400"} />
+        </div>
+        <div className="flex gap-4 text-xs text-stone-500">
+          <span>Carbs <b className="text-stone-700">{Math.round(totals.c)} g</b></span>
+          <span>Fat <b className="text-stone-700">{Math.round(totals.f)} g</b></span>
+          {cycleDay && phase && <span className="ml-auto text-amber-600">{phase.name} · day {cycleDay}</span>}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+        <h2 className="text-sm font-medium text-stone-500 flex items-center gap-1 mb-1"><Droplet size={15} /> Micronutrient guide</h2>
+        <div className="flex gap-6 text-sm"><span>Vitamin D <b className="text-stone-800">{totals.vd.toFixed(1)} µg</b></span><span>Iron <b className="text-stone-800">{totals.fe.toFixed(1)} mg</b></span></div>
+        <p className="text-xs text-stone-400 mt-2">Directional only — compare the trend against your blood tests over time.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+        <h2 className="text-sm font-medium text-stone-500 mb-3">How you feel</h2>
+        <p className="text-xs text-stone-400 mb-1">Energy</p>
+        <div className="flex gap-2 mb-3">
+          {ENERGY.map((k) => <button key={k} onClick={() => setEnergy(k)} className={`flex-1 py-2 rounded-xl text-sm ${ck.energy === k ? "bg-violet-200 text-violet-900 font-medium" : "bg-stone-50 text-stone-500"}`}>{k}</button>)}
+        </div>
+        <p className="text-xs text-stone-400 mb-1">Mood</p>
+        <div className="flex gap-2">
+          {MOODS.map((m) => <button key={m.key} onClick={() => setMood(m.key)} className={`flex-1 py-2 rounded-xl text-sm ${ck.feeling === m.key ? `${m.sel} font-medium` : "bg-stone-50 text-stone-500"}`}>{m.label}</button>)}
+        </div>
+        <p className="text-xs text-stone-400 mt-2">Shared with your strength app — log it in either, see it in both, and against your cycle on the Cycle tab.</p>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+        <h2 className="text-sm font-medium text-stone-500 mb-3">{isToday ? "Today's food" : "Food logged"}</h2>
+        {log.entries.length === 0 && <p className="text-sm text-stone-400 mb-3">Nothing logged yet — tap a meal below to add it.</p>}
+        <div className="space-y-2">
+          {log.entries.map((e) => (
+            <div key={e.uid} className="flex items-center gap-2 text-sm">
+              <span className="flex-1">{e.name}</span>
+              <span className="text-stone-400 w-16 text-right">{Math.round(e.kcal * e.qty)} kcal</span>
+              <button onClick={() => setQty(e.uid, -0.5)} className="p-1 rounded-lg hover:bg-stone-100"><Minus size={14} /></button>
+              <span className="w-8 text-center">{e.qty}×</span>
+              <button onClick={() => setQty(e.uid, 0.5)} className="p-1 rounded-lg hover:bg-stone-100"><Plus size={14} /></button>
+              <button onClick={() => remove(e.uid)} className="p-1 rounded-lg hover:bg-rose-50 text-rose-400"><Trash2 size={14} /></button>
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-stone-100 mt-3 pt-3">
+          <p className="text-xs text-stone-400 mb-2">Quick add</p>
+          <div className="flex flex-wrap gap-2">
+            {meals.map((m) => <button key={m.id} onClick={() => add(m)} className="text-xs px-3 py-1.5 rounded-full bg-violet-50 text-violet-700 hover:bg-violet-100">+ {m.name}</button>)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============ WEEK ============ */
+function Week({ settings, goToDate, setTab }) {
+  const [off, setOff] = useState(0);
+  const data = weekDatesOffset(off).map((d) => {
+    const l = lget("food:log:" + d, { entries: [] });
+    const kcal = (l.entries || []).reduce((a, e) => a + e.kcal * e.qty, 0);
+    return { d, kcal, target: isTrainingDay(d) ? settings.trainTarget : settings.restTarget, logged: (l.entries || []).length > 0 };
+  });
+  const elapsed = data.filter((x) => x.logged);
+  const balance = Math.round(elapsed.reduce((a, x) => a + x.kcal, 0) - elapsed.reduce((a, x) => a + x.target, 0));
+  const max = Math.max(...data.map((x) => Math.max(x.kcal, x.target)), 1);
+  const label = off === 0 ? "This week" : off === 1 ? "Last week" : `${shortDate(data[0].d)} – ${shortDate(data[6].d)}`;
+  const openDay = (d) => { goToDate(d); setTab("today"); };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <button onClick={() => setOff(off + 1)} className="p-2 rounded-xl bg-white border border-stone-200"><ChevronLeft size={16} /></button>
+        <span className="text-sm font-medium text-stone-600">{label}</span>
+        <button onClick={() => off > 0 && setOff(off - 1)} disabled={off === 0} className={`p-2 rounded-xl bg-white border border-stone-200 ${off === 0 ? "opacity-30" : ""}`}><ChevronRight size={16} /></button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+        <h2 className="text-sm font-medium text-stone-500 mb-1">Balance ({label.toLowerCase()})</h2>
+        {elapsed.length === 0 ? <p className="text-sm text-stone-400">No days logged in this week.</p> : (
+          <React.Fragment>
+            <p className="text-2xl font-medium">{balance >= 0 ? "+" : ""}{balance} kcal</p>
+            <p className="text-xs text-stone-500 mt-1">
+              {balance < -1500 ? "Running under — room to eat more, no need to hold back." :
+               balance > 1500 ? "Running over — ease back a little across the next days." :
+               "Nicely balanced. A party day evens out — that's the point."}
+            </p>
+          </React.Fragment>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
+        {data.map((x) => (
+          <button key={x.d} onClick={() => openDay(x.d)} className="w-full text-left">
+            <div className="flex justify-between text-xs mb-1"><span className="text-stone-500">{shortDay(x.d)} {shortDate(x.d)}</span><span className="text-stone-400">{x.logged ? `${Math.round(x.kcal)} / ${x.target}` : "tap to add"}</span></div>
+            <div className="h-2 rounded-full bg-stone-100 overflow-hidden relative">
+              <div className="absolute top-0 bottom-0 w-px bg-stone-400" style={{ left: `${(x.target / max) * 100}%` }} />
+              <div className={`h-full ${x.kcal < x.target * 0.8 ? "bg-amber-300" : "bg-violet-300"}`} style={{ width: `${Math.min(100, (x.kcal / max) * 100)}%` }} />
+            </div>
+          </button>
+        ))}
+        <p className="text-xs text-stone-400 pt-1">Tap any day to add or fix what you ate. Aim for the week to balance, not every day.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ============ MEALS ============ */
+function Meals(props) {
+  const [sub, setSub] = useState("recipes");
+  return (
+    <div className="space-y-3">
+      <div className="bg-white rounded-2xl border border-stone-200 p-1 flex">
+        {[["recipes", "Recipes"], ["ingredients", "Ingredients"]].map(([id, label]) => (
+          <button key={id} onClick={() => setSub(id)} className={`flex-1 py-1.5 rounded-xl text-sm font-medium ${sub === id ? "bg-amber-100 text-amber-800" : "text-stone-500"}`}>{label}</button>
+        ))}
+      </div>
+      {sub === "recipes" ? <Recipes {...props} /> : <IngredientDB foods={props.foods} customFoods={props.customFoods} saveCustomFoods={props.saveCustomFoods} />}
+    </div>
+  );
+}
+
+function Recipes({ meals, saveMeals, log, saveLog, settings, foods }) {
+  const [editing, setEditing] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const cur = settings.currency || "$";
+  const startNew = () => setEditing({ id: "u" + Date.now(), name: "", servings: 1, steps: "", ing: [blankIng()], isNew: true });
+  const editExisting = (m) => setEditing({ ...m, ing: (m.ing || [blankIng()]).map(normIng) });
+  const logIt = (m) => { const ps = calc(m); saveLog({ ...log, entries: [...log.entries, { name: m.name, ...ps, qty: 1, uid: Date.now() + Math.random() }] }); };
+  const del = (id) => saveMeals(meals.filter((m) => m.id !== id));
+
+  if (editing) return <RecipeEditor recipe={editing} cur={cur} foods={foods} onCancel={() => setEditing(null)} onSave={(r) => {
+    const { isNew, ...rest } = r;
+    saveMeals(meals.some((m) => m.id === r.id) ? meals.map((m) => m.id === r.id ? rest : m) : [...meals, rest]);
+    setEditing(null);
+  }} />;
+
+  return (
+    <div className="space-y-3">
+      <button onClick={startNew} className="w-full py-2.5 rounded-2xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Plus size={16} /> New recipe card</button>
+      {meals.map((m) => {
+        const ps = calc(m); const open = openId === m.id;
+        return (
+          <div key={m.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
+            <button onClick={() => setOpenId(open ? null : m.id)} className="w-full p-3 flex items-center gap-3 text-left">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{m.name}</p>
+                <p className="text-xs text-stone-400">{Math.round(ps.kcal)} kcal · {Math.round(ps.p)}P / {Math.round(ps.c)}C / {Math.round(ps.f)}F{ps.cost ? ` · ${cur}${ps.cost.toFixed(2)}/serve` : ""}</p>
+              </div>
+              {open ? <ChevronUp size={16} className="text-stone-400" /> : <ChevronDown size={16} className="text-stone-400" />}
+            </button>
+            {open && (
+              <div className="px-4 pb-4 space-y-3">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-600 bg-stone-50 rounded-xl p-3">
+                  <span>Per serving · makes {m.servings}</span>
+                  <span className="font-medium text-stone-800">{Math.round(ps.kcal)} kcal</span>
+                  <span>{Math.round(ps.p)}P / {Math.round(ps.c)}C / {Math.round(ps.f)}F</span>
+                  {ps.fe > 0 && <span>Iron {ps.fe.toFixed(1)} mg</span>}
+                  {ps.vd > 0 && <span>Vit D {ps.vd.toFixed(1)} µg</span>}
+                  {ps.cost > 0 && <span className="text-violet-700 font-medium">{cur}{ps.cost.toFixed(2)}/serve</span>}
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-stone-500 mb-1">Ingredients</p>
+                  <ul className="text-sm text-stone-700 space-y-0.5">
+                    {(m.ing || []).map((ig, i) => <li key={i} className="flex justify-between"><span>{ig.name || "—"}</span><span className="text-stone-400">{ig.g != null ? `${ig.g} g` : ""}</span></li>)}
+                  </ul>
+                </div>
+                {m.steps && <div><p className="text-xs font-medium text-stone-500 mb-1">Method</p><p className="text-sm text-stone-700 whitespace-pre-wrap">{m.steps}</p></div>}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => logIt(m)} className="flex-1 py-2 rounded-xl bg-violet-50 text-violet-700 text-sm font-medium">Log to this day</button>
+                  <button onClick={() => editExisting(m)} className="px-3 py-2 rounded-xl border border-stone-200 text-sm flex items-center gap-1"><Pencil size={14} /> Edit</button>
+                  <button onClick={() => del(m.id)} className="px-3 py-2 rounded-xl border border-stone-200 text-rose-500 text-sm"><Trash2 size={14} /></button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RecipeEditor({ recipe, onSave, onCancel, cur, foods }) {
+  const [r, setR] = useState({ ...recipe, ing: recipe.ing.length ? recipe.ing : [blankIng()] });
+  const ps = calc(r);
+  const setIng = (i, patch) => setR({ ...r, ing: r.ing.map((x, j) => j === i ? { ...x, ...patch } : x) });
+  const addIng = () => setR({ ...r, ing: [...r.ing, blankIng()] });
+  const delIng = (i) => setR({ ...r, ing: r.ing.filter((_, j) => j !== i) });
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
+        <div className="flex items-center justify-between"><h2 className="text-base font-medium">{recipe.isNew ? "New recipe" : "Edit recipe"}</h2><button onClick={onCancel} className="p-1 text-stone-400"><X size={18} /></button></div>
+        <input value={r.name} onChange={(e) => setR({ ...r, name: e.target.value })} placeholder="Recipe name" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-stone-500">Makes</span>
+          <input value={r.servings} onChange={(e) => setR({ ...r, servings: +e.target.value || 1 })} type="number" className="w-16 px-2 py-1.5 rounded-lg border border-stone-200 text-sm text-center" />
+          <span className="text-sm text-stone-500">serving(s)</span>
+        </div>
+        <p className="text-xs text-stone-400">Pick each ingredient from the list and type the grams. Nutrition fills in automatically — add a price per kg for cost. Manage the list under the Ingredients tab.</p>
+        <div className="space-y-2">{r.ing.map((ig, i) => <IngredientRow key={i} ig={ig} cur={cur} foods={foods} onChange={(patch) => setIng(i, patch)} onDelete={() => delIng(i)} />)}</div>
+        <button onClick={addIng} className="w-full py-2 rounded-xl border border-stone-200 text-sm text-stone-600 flex items-center justify-center gap-1"><Plus size={14} /> Ingredient</button>
+        <textarea value={r.steps || ""} onChange={(e) => setR({ ...r, steps: e.target.value })} placeholder="Method (optional) — one step per line" rows={3} className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+      </div>
+
+      <div className="bg-violet-50 rounded-2xl border border-violet-100 p-3 text-sm text-violet-900 space-y-1">
+        <div>Per serving: <b>{Math.round(ps.kcal)} kcal</b> · {Math.round(ps.p)}P / {Math.round(ps.c)}C / {Math.round(ps.f)}F</div>
+        <div className="text-xs">Iron {ps.fe.toFixed(1)} mg · Vit D {ps.vd.toFixed(1)} µg{ps.cost > 0 ? ` · ${cur}${ps.cost.toFixed(2)}/serve` : ""}</div>
+      </div>
+      <button onClick={() => r.name && onSave(r)} className="w-full py-2.5 rounded-2xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Check size={16} /> Save recipe</button>
+    </div>
+  );
+}
+
+function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
+  const [open, setOpen] = useState(false);
+  const factor = (+ig.g || 0) / 100;
+  const ccal = Math.round((+ig.k || 0) * factor);
+  const ccost = (+ig.price || 0) * (+ig.g || 0) / 1000;
+  const inList = foods.some((x) => x.name === ig.name);
+  const pick = (name) => {
+    if (name === "__custom") { onChange({ name: "", k: "", p: "", c: "", f: "", fe: "", vd: "" }); setOpen(true); return; }
+    const f = foods.find((x) => x.name === name);
+    if (f) onChange({ name: f.name, k: f.k, p: f.p, c: f.c, f: f.f, fe: f.fe, vd: f.vd });
+  };
+  return (
+    <div className="border border-stone-100 rounded-xl p-2 space-y-2">
+      <div className="flex gap-2">
+        <select value={inList ? ig.name : (ig.name ? "__custom" : "")} onChange={(e) => pick(e.target.value)} className="flex-1 px-2 py-1.5 rounded-lg border border-stone-200 text-sm bg-white">
+          <option value="">Choose ingredient…</option>
+          {foods.map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
+          <option value="__custom">Custom / other…</option>
+        </select>
+        <button onClick={onDelete} className="p-1 text-stone-300 hover:text-rose-400"><Trash2 size={14} /></button>
+      </div>
+      {!inList && <input value={ig.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Ingredient name" className="w-full px-2 py-1.5 rounded-lg border border-stone-200 text-xs" />}
+      <div className="flex gap-2">
+        <LabeledNum label="Amount (g)" value={ig.g} onChange={(v) => onChange({ g: v })} w="flex-1" />
+        <LabeledNum label={`Price (${cur}/kg)`} value={ig.price} onChange={(v) => onChange({ price: v })} w="flex-1" />
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-stone-400">→ {ccal} kcal{ccost > 0 ? ` · ${cur}${ccost.toFixed(2)}` : ""}</span>
+        <button onClick={() => setOpen(!open)} className="text-stone-400 flex items-center gap-1">nutrition / 100 g {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</button>
+      </div>
+      {open && <div className="grid grid-cols-3 gap-1.5">{NUT_FIELDS.map(([k, label]) => <LabeledNum key={k} label={label} value={ig[k]} onChange={(v) => onChange({ [k]: v })} />)}</div>}
+    </div>
+  );
+}
+
+/* ============ INGREDIENT DATABASE ============ */
+function IngredientDB({ foods, customFoods, saveCustomFoods }) {
+  const [editing, setEditing] = useState(null);
+  const [filter, setFilter] = useState("");
+  const shown = foods.filter((f) => f.name.toLowerCase().includes(filter.toLowerCase()));
+  const startNew = () => setEditing({ name: "", k: "", p: "", c: "", f: "", fe: "", vd: "", isNew: true });
+  const saveFood = (f) => { saveCustomFoods([...customFoods.filter((c) => c.name !== f.name), { name: f.name, k: +f.k || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, vd: +f.vd || 0 }]); setEditing(null); };
+  const removeOverride = (name) => saveCustomFoods(customFoods.filter((c) => c.name !== name));
+
+  if (editing) {
+    const e = editing;
+    return (
+      <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
+        <div className="flex items-center justify-between"><h2 className="text-base font-medium">{e.isNew ? "New ingredient" : "Edit ingredient"}</h2><button onClick={() => setEditing(null)} className="p-1 text-stone-400"><X size={18} /></button></div>
+        <div>
+          <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-0.5">Name</label>
+          <input value={e.name} onChange={(ev) => setEditing({ ...e, name: ev.target.value })} placeholder="e.g. My high-protein yoghurt" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+        </div>
+        <p className="text-xs text-stone-400">Enter the values per 100 g straight from the nutrition label.</p>
+        <div className="grid grid-cols-3 gap-2">{NUT_FIELDS.map(([k, label]) => <LabeledNum key={k} label={label} value={e[k]} onChange={(v) => setEditing({ ...e, [k]: v })} />)}</div>
+        <button onClick={() => e.name && saveFood(e)} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Check size={16} /> Save ingredient</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <button onClick={startNew} className="w-full py-2.5 rounded-2xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Plus size={16} /> Add my own ingredient</button>
+      <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search ingredients…" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+      <p className="text-xs text-stone-400">Values are per 100 g. Edit any item to match your own labels — your edits override the defaults. Tap a custom or edited item's bin to revert.</p>
+      <div className="space-y-2">
+        {shown.map((f) => (
+          <div key={f.name} className="bg-white rounded-2xl border border-stone-200 p-3 flex items-center gap-2">
+            <div className="flex-1">
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                {f.name}
+                {f.source === "custom" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">yours</span>}
+                {f.source === "edited" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">edited</span>}
+              </p>
+              <p className="text-xs text-stone-400">{f.k} kcal · {f.p}P / {f.c}C / {f.f}F · Fe {f.fe} · D {f.vd} (per 100 g)</p>
+            </div>
+            <button onClick={() => setEditing({ ...f })} className="p-1.5 text-stone-400 hover:text-violet-600"><Pencil size={15} /></button>
+            {f.source !== "builtin" && <button onClick={() => removeOverride(f.name)} className="p-1.5 text-stone-300 hover:text-rose-400"><Trash2 size={15} /></button>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ============ CYCLE (reads/writes shared sl:checkins) ============ */
+function Cycle({ checkins, saveCheckin, dateK, settings }) {
+  const today = dateK;
+  const bleedDays = Object.keys(checkins).filter((d) => checkins[d] && checkins[d].bleed === "Bleeding").sort();
+  const bleedSet = new Set(bleedDays);
+  const toggle = (d) => saveCheckin(d, { bleed: bleedSet.has(d) ? "" : "Bleeding" });
+
+  const starts = [];
+  let prev = null;
+  for (const d of bleedDays) { if (prev === null || daysBetween(prev, d) > 3) starts.push(d); prev = d; }
+  const lastStart = starts.length ? starts[starts.length - 1] : null;
+  let avgLen = settings.cycleLength || 28;
+  let usingAvg = false;
+  if (starts.length >= 2) {
+    const diffs = [];
+    for (let i = 1; i < starts.length; i++) diffs.push(daysBetween(starts[i - 1], starts[i]));
+    const recent = diffs.slice(-6);
+    avgLen = Math.round(recent.reduce((a, b) => a + b, 0) / recent.length);
+    usingAvg = true;
+  }
+  const lastBleed = bleedDays.length ? bleedDays[bleedDays.length - 1] : null;
+  const cycleDay = lastStart && daysBetween(lastStart, today) >= 0 ? daysBetween(lastStart, today) + 1 : null;
+  const phase = cyclePhase(cycleDay);
+  const predNextStart = lastStart ? addDays(lastStart, avgLen) : null;
+  const daysToNext = predNextStart ? daysBetween(today, predNextStart) : null;
+  const predicted = new Set();
+  if (predNextStart) for (let i = 0; i < 5; i++) predicted.add(addDays(predNextStart, i));
+
+  const [cur, setCur] = useState(() => { const d = new Date(today); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const monthLabel = new Date(cur.y, cur.m, 1).toLocaleDateString("en-AU", { month: "long", year: "numeric" });
+  const firstWeekday = (new Date(cur.y, cur.m, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(cur.y, cur.m + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  const prevMonth = () => setCur(cur.m === 0 ? { y: cur.y - 1, m: 11 } : { y: cur.y, m: cur.m - 1 });
+  const nextMonth = () => setCur(cur.m === 11 ? { y: cur.y + 1, m: 0 } : { y: cur.y, m: cur.m + 1 });
+  const dn = (n) => `${n} day${n === 1 ? "" : "s"}`;
+
+  const PHASES = [
+    { name: "Menstrual", range: "days 1–5", feel: "Energy often lowest the first day or two, then lifting. Mood can feel tender; many feel relief once the period arrives.", train: "Gentle to moderate early; ease back into strength as bleeding settles. No need to push the first days." },
+    { name: "Follicular", range: "≈ days 6–13", feel: "Rising energy and mood as oestrogen climbs — often the most motivated, best-feeling stretch.", train: "Prime time for heavy strength, intervals and PRs; your body handles intensity well here." },
+    { name: "Around ovulation", range: "≈ days 14–16", feel: "Peak energy and strength; confidence and libido often high.", train: "Great for top-end efforts — but joints sit a touch laxer at the oestrogen peak, so mind form on heavy lifts." },
+    { name: "Luteal", range: "≈ day 17 to your period", feel: "Energy tapers, body runs warmer, sleep and mood can dip; appetite and cravings (hello, chips) climb pre-period.", train: "Favour steady-state and moderate strength; intensity feels harder. Lean into more carbs and protein, and protect recovery." },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-amber-50 rounded-2xl border border-amber-200 p-4">
+        {cycleDay ? (
+          <React.Fragment>
+            <p className="text-sm text-amber-900 font-medium">{phase.name} · cycle day {cycleDay}</p>
+            <p className="text-xs text-amber-800 mt-1">{phase.tip}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-amber-700">
+              {lastBleed && <span>Last bleed {dn(daysBetween(lastBleed, today))} ago</span>}
+              {daysToNext != null && <span>{daysToNext >= 0 ? `Expected in ~${dn(daysToNext)}` : `Expected ~${dn(-daysToNext)} ago`}</span>}
+            </div>
+            <p className="text-[11px] text-amber-600 mt-2">Based on {usingAvg ? `a ${avgLen}-day average of your recent cycles` : `your usual ${avgLen}-day cycle`}. It re-estimates each time you log a real bleed. Perimenopause is irregular — a guide, not a clock.</p>
+          </React.Fragment>
+        ) : <p className="text-sm text-amber-800">Tap the days you bleed. Once there are a couple, you'll see your phase and an estimated next date (starting from your usual {avgLen}-day cycle).</p>}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-stone-100"><ChevronLeft size={16} /></button>
+          <span className="text-sm font-medium text-stone-700">{monthLabel}</span>
+          <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-stone-100"><ChevronRight size={16} /></button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 mb-1">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="text-center text-[11px] text-stone-400">{d}</div>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (d === null) return <div key={i} />;
+            const ds = fmt(new Date(cur.y, cur.m, d));
+            const isBleed = bleedSet.has(ds);
+            const isPred = !isBleed && predicted.has(ds);
+            const isToday = ds === today;
+            const ck = checkins[ds] || {};
+            const mood = ck.feeling && ck.feeling !== "—" ? ck.feeling : null;
+            const energy = ck.energy && ck.energy !== "—" ? ck.energy : null;
+            let cls = "text-stone-600 hover:bg-stone-100";
+            if (isBleed) cls = "bg-violet-500 text-white font-medium";
+            else if (isPred) cls = "bg-violet-100 text-violet-700";
+            else if (isToday) cls = "border-2 border-violet-400 text-stone-800";
+            return (
+              <button key={i} onClick={() => toggle(ds)} className={`relative aspect-square rounded-xl flex items-center justify-center text-sm ${cls}`}>
+                {mood && <span className={`absolute top-1 left-1/2 -translate-x-1/2 w-4 h-1 rounded-full ${moodBar(mood)}`} />}
+                {d}
+                {energy && <EnergyBars level={energy} onBleed={isBleed} />}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap gap-3 mt-3 text-[11px] text-stone-400">
+          <span className="flex items-center gap-1"><span className="w-3.5 h-3.5 rounded-md bg-violet-500" /> bleed</span>
+          <span className="flex items-center gap-1"><span className="w-3.5 h-3.5 rounded-md bg-violet-100" /> expected</span>
+          <span className="flex items-center gap-1"><span className="w-3.5 h-3.5 rounded-md border-2 border-violet-400" /> today</span>
+          <span className="flex items-center gap-1"><span className="w-4 h-1 rounded-full bg-violet-400" /> mood</span>
+          <span className="flex items-center gap-1"><span className="flex items-end gap-0.5"><span className="w-1 h-1.5 rounded-sm bg-violet-600" /><span className="w-1 h-2 rounded-sm bg-violet-600" /><span className="w-1 h-2.5 rounded-sm bg-violet-600" /></span> energy</span>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <h2 className="text-sm font-medium text-stone-500 px-1">Phase guide — how each tends to feel</h2>
+        {PHASES.map((ph) => {
+          const isCurrent = phase && phase.name === ph.name;
+          return (
+            <div key={ph.name} className={`rounded-2xl border p-3 ${isCurrent ? "bg-violet-50 border-violet-200" : "bg-white border-stone-200"}`}>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium">{ph.name}</p>
+                <span className="text-xs text-stone-400">{ph.range}</span>
+                {isCurrent && <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-violet-200 text-violet-800">you're here</span>}
+              </div>
+              <p className="text-xs text-stone-600 mt-1"><b className="font-medium">Feel:</b> {ph.feel}</p>
+              <p className="text-xs text-stone-600 mt-1"><b className="font-medium">Training:</b> {ph.train}</p>
+            </div>
+          );
+        })}
+        <p className="text-[11px] text-stone-400 px-1">The training notes follow Dr Stacy Sims' general framework for cycling women. In perimenopause cycles get erratic, so your own logged energy and mood are the truer signal — and Sims emphasises that through this stage, heavy strength, sprint-style intervals and jump (plyometric) work pay off regardless of phase.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ============ SETTINGS ============ */
+function SettingsModal({ settings, saveSettings, onClose }) {
+  const [s, setS] = useState(settings);
+  const Row = ({ k, label }) => (
+    <div className="flex items-center justify-between"><span className="text-sm text-stone-600">{label}</span>
+      <input type="number" value={s[k]} onChange={(e) => setS({ ...s, [k]: +e.target.value })} className="w-24 px-3 py-2 rounded-xl border border-stone-200 text-sm text-right" /></div>
+  );
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-10 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-5 w-full max-w-sm space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between"><h2 className="text-lg font-medium">Settings</h2><button onClick={onClose} className="p-1 text-stone-400"><X size={20} /></button></div>
+        <Row k="restTarget" label="Rest-day calories" />
+        <Row k="trainTarget" label="Training-day calories" />
+        <Row k="proteinTarget" label="Protein target (g)" />
+        <Row k="cycleLength" label="Usual cycle length (days)" />
+        <p className="text-xs text-stone-400">Everything saves automatically. Defaults are estimates (~2,000 anchor); adjust by how strength, energy and sleep respond. Rest vs training day is detected from your strength log.</p>
+        <button onClick={() => { saveSettings(s); onClose(); }} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium hover:bg-violet-300">Save</button>
+      </div>
+    </div>
+  );
+}
+
+try {
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+} catch (err) {
+  document.getElementById("root").innerHTML = '<div style="padding:24px;font-family:system-ui;color:#44403c;line-height:1.5"><b>Something went wrong starting the app.</b><br>' + (err && err.message ? err.message : err) + '</div>';
+}
+</script>
+<script>
+  setTimeout(function () {
+    var r = document.getElementById("root");
+    if (r && r.innerHTML.trim() === "") {
+      r.innerHTML = '<div style="padding:24px;font-family:system-ui;color:#44403c;line-height:1.5">'
+        + '<b>Couldn\'t load.</b><br>This page needs internet access to fetch React and Tailwind. '
+        + 'It works on a normal web host (and in Chrome) — some in-app preview panes block those scripts.'
+        + '</div>';
+    }
+  }, 5000);
+</script>
+</body>
+</html>
