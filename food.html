@@ -270,7 +270,7 @@ function App() {
           ))}
         </div>
 
-        {tab === "today" && <Today log={log} saveLog={saveLog} meals={meals} settings={settings} phase={phase} cycleDay={cycleDay} viewDate={viewDate} goToDate={goToDate} checkins={checkins} saveCheckin={saveCheckin} />}
+        {tab === "today" && <Today log={log} saveLog={saveLog} meals={meals} foods={mergedFoods} settings={settings} phase={phase} cycleDay={cycleDay} viewDate={viewDate} goToDate={goToDate} checkins={checkins} saveCheckin={saveCheckin} />}
         {tab === "week" && <Week settings={settings} goToDate={goToDate} setTab={setTab} />}
         {tab === "meals" && <Meals meals={meals} saveMeals={saveMeals} log={log} saveLog={saveLog} settings={settings} foods={mergedFoods} customFoods={customFoods} saveCustomFoods={saveCustomFoods} />}
         {tab === "cycle" && <Cycle checkins={checkins} saveCheckin={saveCheckin} dateK={todayKey()} settings={settings} />}
@@ -282,21 +282,51 @@ function App() {
 }
 
 /* ============ TODAY ============ */
-function Today({ log, saveLog, meals, settings, phase, cycleDay, viewDate, goToDate, checkins, saveCheckin }) {
+function Today({ log, saveLog, meals, foods, settings, phase, cycleDay, viewDate, goToDate, checkins, saveCheckin }) {
   const isToday = viewDate === todayKey();
   const training = isTrainingDay(viewDate);
   const ck = checkins[viewDate] || {};
-  const [plate, setPlate] = useState(null);
+  const [plate, setPlate] = useState(null); // { name:"", ings:[{name,g,k,p,c,f,fe,ca}] }
+  const [ingDraft, setIngDraft] = useState({ name: "", g: "" });
+  const [snack, setSnack] = useState(null); // { name, kcal, p }
   const setEnergy = (k) => saveCheckin(viewDate, { energy: ck.energy === k ? "—" : k });
   const setMood = (k) => saveCheckin(viewDate, { feeling: ck.feeling === k ? "—" : k });
+
+  /* macros for an ingredient at a given gram weight (library values are per 100 g) */
+  const ingMacros = (f, g) => {
+    const factor = (+g || 0) / 100;
+    return { kcal: (+(f.k ?? f.kcal) || 0) * factor, p: (+f.p || 0) * factor, c: (+f.c || 0) * factor, f: (+f.f || 0) * factor, fe: (+f.fe || 0) * factor, ca: (+f.ca || 0) * factor };
+  };
+  const addIngToPlate = () => {
+    const f = (foods || []).find((x) => x.name === ingDraft.name);
+    const g = +ingDraft.g;
+    if (!f || !(g > 0)) return;
+    setPlate((p) => ({ ...p, ings: [...(p.ings || []), { name: f.name, g, k: +(f.k ?? f.kcal) || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, ca: +f.ca || 0 }] }));
+    setIngDraft({ name: "", g: "" });
+  };
+  const removeIngFromPlate = (idx) => setPlate((p) => ({ ...p, ings: (p.ings || []).filter((_, i) => i !== idx) }));
+
   const addPlate = () => {
+    const ings = plate.ings || [];
+    if (ings.length === 0) { setPlate(null); return; }
+    const name = (plate.name || "").trim();
     const entries = [...log.entries];
-    Object.keys(plate).forEach((id) => {
-      const qty = plate[id];
-      if (qty > 0) { const m = meals.find((x) => x.id === id); if (m) { const ps = calc(m); entries.push({ name: m.name, ...ps, qty, uid: Date.now() + Math.random() }); } }
-    });
+    if (name) {
+      const sum = ings.reduce((a, i) => { const m = ingMacros(i, i.g); return { kcal: a.kcal + m.kcal, p: a.p + m.p, c: a.c + m.c, f: a.f + m.f, fe: a.fe + m.fe, ca: a.ca + m.ca }; }, { kcal: 0, p: 0, c: 0, f: 0, fe: 0, ca: 0 });
+      entries.push({ name, ...sum, qty: 1, uid: Date.now() + Math.random() });
+    } else {
+      ings.forEach((i) => entries.push({ name: `${i.name} · ${i.g} g`, ...ingMacros(i, i.g), qty: 1, uid: Date.now() + Math.random() }));
+    }
     saveLog({ ...log, entries });
     setPlate(null);
+    setIngDraft({ name: "", g: "" });
+  };
+
+  const addSnack = () => {
+    const kc = +snack.kcal || 0;
+    const name = snack.name.trim() || "Snack";
+    saveLog({ ...log, entries: [...log.entries, { name, kcal: kc, p: +snack.p || 0, c: 0, f: 0, fe: 0, ca: 0, qty: 1, snack: true, uid: Date.now() + Math.random() }] });
+    setSnack(null);
   };
 
   const totals = log.entries.reduce((a, e) => ({
@@ -382,7 +412,7 @@ function Today({ log, saveLog, meals, settings, phase, cycleDay, viewDate, goToD
         <div className="space-y-2">
           {log.entries.map((e) => (
             <div key={e.uid} className="flex items-center gap-2 text-sm">
-              <span className="flex-1">{e.name}</span>
+              <span className="flex-1">{e.name}{e.snack && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-stone-100 text-stone-400 align-middle">snack</span>}</span>
               <span className="text-stone-400 w-16 text-right">{Math.round(e.kcal * e.qty)} kcal</span>
               <button onClick={() => setQty(e.uid, -0.5)} className="p-1 rounded-lg hover:bg-stone-100"><Minus size={14} /></button>
               <span className="w-8 text-center">{e.qty}×</span>
@@ -394,7 +424,10 @@ function Today({ log, saveLog, meals, settings, phase, cycleDay, viewDate, goToD
         <div className="border-t border-stone-100 mt-3 pt-3">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-stone-400">Quick add</p>
-            <button onClick={() => setPlate({})} className="text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700">Build a plate</button>
+            <div className="flex gap-2">
+              <button onClick={() => setSnack({ name: "", kcal: "", p: "" })} className="text-xs px-3 py-1 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-200">+ Snack</button>
+              <button onClick={() => setPlate({ ings: [], name: "" })} className="text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200">Build a plate</button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {meals.map((m) => <button key={m.id} onClick={() => add(m)} className="text-xs px-3 py-1.5 rounded-full bg-violet-50 text-violet-700 hover:bg-violet-100">+ {m.name}</button>)}
@@ -404,24 +437,67 @@ function Today({ log, saveLog, meals, settings, phase, cycleDay, viewDate, goToD
 
       {plate !== null && (
         <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-10 p-4" onClick={() => setPlate(null)}>
-          <div className="bg-white rounded-2xl p-4 w-full max-w-sm max-h-[80vh] overflow-y-auto space-y-2" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl p-4 w-full max-w-sm max-h-[85vh] overflow-y-auto space-y-3" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-base font-medium">Build a plate</h2>
               <button onClick={() => setPlate(null)} className="p-1 text-stone-400"><X size={18} /></button>
             </div>
-            <p className="text-xs text-stone-400">Mix your frozen components — set portions, then drop them on {isToday ? "today" : "this day"} together. Adjusting a portion here never changes the saved recipe.</p>
-            {meals.map((m) => {
-              const q = plate[m.id] || 0;
-              return (
-                <div key={m.id} className="flex items-center gap-2 text-sm">
-                  <span className="flex-1">{m.name}</span>
-                  <button onClick={() => setPlate({ ...plate, [m.id]: Math.max(0, q - 0.5) })} className="p-1 rounded-lg hover:bg-stone-100"><Minus size={14} /></button>
-                  <span className={`w-8 text-center ${q > 0 ? "text-violet-700 font-medium" : "text-stone-300"}`}>{q}×</span>
-                  <button onClick={() => setPlate({ ...plate, [m.id]: q + 0.5 })} className="p-1 rounded-lg hover:bg-stone-100"><Plus size={14} /></button>
+
+            <div>
+              <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">Dish name <span className="normal-case tracking-normal text-stone-300">(optional)</span></label>
+              <input value={plate.name || ""} onChange={(e) => setPlate({ ...plate, name: e.target.value })} placeholder="e.g. Chicken stir-fry" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+              <p className="text-[11px] text-stone-400 mt-1">Name it to log as one tidy line, or leave blank to add each ingredient separately.</p>
+            </div>
+
+            <div className="pt-1 border-t border-stone-100">
+              <p className="text-[11px] uppercase tracking-wide text-stone-400 mb-2 mt-2">Ingredients</p>
+              {(plate.ings || []).map((i, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm mb-1">
+                  <span className="flex-1">{i.name} · {i.g} g</span>
+                  <span className="text-stone-400 w-14 text-right">{Math.round(ingMacros(i, i.g).kcal)} kcal</span>
+                  <button onClick={() => removeIngFromPlate(idx)} className="p-1 rounded-lg hover:bg-rose-50 text-rose-400"><Trash2 size={14} /></button>
                 </div>
-              );
-            })}
-            <button onClick={addPlate} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium mt-2 hover:bg-violet-300">Add to {isToday ? "today" : "this day"}</button>
+              ))}
+              <div className="flex items-center gap-2 mt-1">
+                <select value={ingDraft.name} onChange={(e) => setIngDraft({ ...ingDraft, name: e.target.value })} className="flex-1 min-w-0 px-2 py-2 rounded-xl border border-stone-200 text-sm bg-white">
+                  <option value="">Pick an ingredient…</option>
+                  {(foods || []).map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
+                </select>
+                <input type="number" inputMode="decimal" placeholder="g" value={ingDraft.g} onChange={(e) => setIngDraft({ ...ingDraft, g: e.target.value })} className="w-14 px-2 py-2 rounded-xl border border-stone-200 text-sm text-right" />
+                <button onClick={addIngToPlate} disabled={!ingDraft.name || !(+ingDraft.g > 0)} className="p-2 rounded-xl bg-violet-100 text-violet-700 disabled:opacity-40"><Plus size={16} /></button>
+              </div>
+              {ingDraft.name && +ingDraft.g > 0 && (() => { const f = (foods || []).find((x) => x.name === ingDraft.name); if (!f) return null; const mac = ingMacros(f, ingDraft.g); return <p className="text-[11px] text-stone-400 mt-1">≈ {Math.round(mac.kcal)} kcal · {Math.round(mac.p)} g protein for {ingDraft.g} g</p>; })()}
+              <p className="text-[11px] text-stone-400 mt-1">Don't see an ingredient? Add it on the Meals tab and it'll appear here.</p>
+            </div>
+
+            <button onClick={addPlate} disabled={!(plate.ings || []).length} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium mt-1 hover:bg-violet-300 disabled:opacity-40">Add to {isToday ? "today" : "this day"}</button>
+          </div>
+        </div>
+      )}
+
+      {snack !== null && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-10 p-4" onClick={() => setSnack(null)}>
+          <div className="bg-white rounded-2xl p-4 w-full max-w-sm space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-medium">Quick snack</h2>
+              <button onClick={() => setSnack(null)} className="p-1 text-stone-400"><X size={18} /></button>
+            </div>
+            <p className="text-xs text-stone-400">For something you ate but don't want to log in full — a rough calorie note so your day's fuel total stays honest.</p>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">What was it?</label>
+              <input value={snack.name} onChange={(e) => setSnack({ ...snack, name: e.target.value })} placeholder="e.g. handful of chips" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">Approx. calories</label>
+                <input type="number" inputMode="numeric" value={snack.kcal} onChange={(e) => setSnack({ ...snack, kcal: e.target.value })} placeholder="kcal" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+              </div>
+              <div className="w-24">
+                <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">Protein</label>
+                <input type="number" inputMode="numeric" value={snack.p} onChange={(e) => setSnack({ ...snack, p: e.target.value })} placeholder="g (opt.)" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+              </div>
+            </div>
+            <button onClick={addSnack} disabled={!(+snack.kcal > 0)} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium hover:bg-violet-300 disabled:opacity-40">Add to {isToday ? "today" : "this day"}</button>
           </div>
         </div>
       )}
