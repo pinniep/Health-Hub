@@ -82,43 +82,43 @@ const ForkSpoon = (p) => <svg {...{ ...ip(p), fill: "currentColor", stroke: "non
 
 /* ============ food data ============ */
 const FOODS = [
-  { name: "Chicken breast (raw)", k: 106, p: 23, c: 0, f: 1.5, fe: 0.7, vd: 0 },
-  { name: "Pork mince (raw)", k: 220, p: 18, c: 0, f: 16, fe: 1.0, vd: 0.7 },
-  { name: "Egg, whole", k: 143, p: 13, c: 1, f: 10, fe: 1.8, vd: 2 },
-  { name: "Egg white", k: 52, p: 11, c: 0.7, f: 0.2, fe: 0.1, vd: 0 },
-  { name: "Firm tofu", k: 144, p: 17, c: 3, f: 9, fe: 2.7, vd: 0 },
-  { name: "Prawns (raw)", k: 99, p: 24, c: 0, f: 0.3, fe: 0.5, vd: 0 },
-  { name: "Salmon (raw)", k: 208, p: 20, c: 0, f: 13, fe: 0.8, vd: 11 },
-  { name: "Sardines (canned)", k: 208, p: 25, c: 0, f: 11, fe: 2.9, vd: 4.8 },
-  { name: "Mussels (cooked)", k: 172, p: 24, c: 7, f: 4.5, fe: 6.7, vd: 0 },
-  { name: "Jasmine rice (cooked)", k: 130, p: 2.7, c: 28, f: 0.3, fe: 0.2, vd: 0 },
-  { name: "Riceberry rice (cooked)", k: 135, p: 3, c: 28, f: 1, fe: 0.5, vd: 0 },
-  { name: "Rice noodles (cooked)", k: 108, p: 2, c: 25, f: 0.2, fe: 0.2, vd: 0 },
-  { name: "Rolled oats (dry)", k: 379, p: 13, c: 67, f: 7, fe: 4.7, vd: 0 },
-  { name: "Sweet potato (raw)", k: 86, p: 1.6, c: 20, f: 0.1, fe: 0.6, vd: 0 },
-  { name: "Banana", k: 89, p: 1.1, c: 23, f: 0.3, fe: 0.3, vd: 0 },
-  { name: "Apple", k: 52, p: 0.3, c: 14, f: 0.2, fe: 0.1, vd: 0 },
-  { name: "Mixed berries", k: 50, p: 1, c: 12, f: 0.3, fe: 0.4, vd: 0 },
-  { name: "Broccoli", k: 34, p: 2.8, c: 7, f: 0.4, fe: 0.7, vd: 0 },
-  { name: "Pak boong (morning glory)", k: 19, p: 2.6, c: 3, f: 0.2, fe: 1.7, vd: 0 },
-  { name: "Bok choy / Asian greens", k: 13, p: 1.5, c: 2, f: 0.2, fe: 0.8, vd: 0 },
-  { name: "Spinach", k: 23, p: 2.9, c: 3.6, f: 0.4, fe: 2.7, vd: 0 },
-  { name: "Carrot", k: 41, p: 0.9, c: 10, f: 0.2, fe: 0.3, vd: 0 },
-  { name: "Capsicum", k: 31, p: 1, c: 6, f: 0.3, fe: 0.4, vd: 0 },
-  { name: "Onion", k: 40, p: 1.1, c: 9, f: 0.1, fe: 0.2, vd: 0 },
-  { name: "Garlic", k: 149, p: 6, c: 33, f: 0.5, fe: 1.7, vd: 0 },
-  { name: "Chilli", k: 40, p: 2, c: 9, f: 0.4, fe: 1, vd: 0 },
-  { name: "Peanut butter", k: 588, p: 25, c: 20, f: 50, fe: 1.9, vd: 0 },
-  { name: "Chia seeds", k: 486, p: 17, c: 42, f: 31, fe: 7.7, vd: 0 },
-  { name: "Flaxseed meal", k: 534, p: 18, c: 29, f: 42, fe: 5.7, vd: 0 },
-  { name: "High-protein yoghurt", k: 60, p: 10, c: 4, f: 0.2, fe: 0, vd: 0 },
-  { name: "Whey protein powder", k: 380, p: 80, c: 8, f: 5, fe: 0, vd: 0 },
-  { name: "Almond milk (unsweetened)", k: 13, p: 0.5, c: 0.3, f: 1.1, fe: 0.3, vd: 0 },
-  { name: "Olive oil", k: 884, p: 0, c: 0, f: 100, fe: 0, vd: 0 },
-  { name: "Fish sauce", k: 35, p: 5, c: 4, f: 0, fe: 0.7, vd: 0 },
-  { name: "Coconut milk", k: 230, p: 2.3, c: 6, f: 24, fe: 1.6, vd: 0 },
+  { name: "Chicken breast (raw)", k: 106, p: 23, c: 0, f: 1.5, fe: 0.7, ca: 5 },
+  { name: "Pork mince (raw)", k: 220, p: 18, c: 0, f: 16, fe: 1.0, ca: 14 },
+  { name: "Egg, whole", k: 143, p: 13, c: 1, f: 10, fe: 1.8, ca: 56 },
+  { name: "Egg white", k: 52, p: 11, c: 0.7, f: 0.2, fe: 0.1, ca: 7 },
+  { name: "Firm tofu", k: 144, p: 17, c: 3, f: 9, fe: 2.7, ca: 200 },
+  { name: "Prawns (raw)", k: 99, p: 24, c: 0, f: 0.3, fe: 0.5, ca: 70 },
+  { name: "Salmon (raw)", k: 208, p: 20, c: 0, f: 13, fe: 0.8, ca: 9 },
+  { name: "Sardines (canned)", k: 208, p: 25, c: 0, f: 11, fe: 2.9, ca: 380 },
+  { name: "Mussels (cooked)", k: 172, p: 24, c: 7, f: 4.5, fe: 6.7, ca: 33 },
+  { name: "Jasmine rice (cooked)", k: 130, p: 2.7, c: 28, f: 0.3, fe: 0.2, ca: 10 },
+  { name: "Riceberry rice (cooked)", k: 135, p: 3, c: 28, f: 1, fe: 0.5, ca: 10 },
+  { name: "Rice noodles (cooked)", k: 108, p: 2, c: 25, f: 0.2, fe: 0.2, ca: 5 },
+  { name: "Rolled oats (dry)", k: 379, p: 13, c: 67, f: 7, fe: 4.7, ca: 52 },
+  { name: "Sweet potato (raw)", k: 86, p: 1.6, c: 20, f: 0.1, fe: 0.6, ca: 30 },
+  { name: "Banana", k: 89, p: 1.1, c: 23, f: 0.3, fe: 0.3, ca: 5 },
+  { name: "Apple", k: 52, p: 0.3, c: 14, f: 0.2, fe: 0.1, ca: 6 },
+  { name: "Mixed berries", k: 50, p: 1, c: 12, f: 0.3, fe: 0.4, ca: 25 },
+  { name: "Broccoli", k: 34, p: 2.8, c: 7, f: 0.4, fe: 0.7, ca: 47 },
+  { name: "Pak boong (morning glory)", k: 19, p: 2.6, c: 3, f: 0.2, fe: 1.7, ca: 77 },
+  { name: "Bok choy / Asian greens", k: 13, p: 1.5, c: 2, f: 0.2, fe: 0.8, ca: 105 },
+  { name: "Spinach", k: 23, p: 2.9, c: 3.6, f: 0.4, fe: 2.7, ca: 99 },
+  { name: "Carrot", k: 41, p: 0.9, c: 10, f: 0.2, fe: 0.3, ca: 33 },
+  { name: "Capsicum", k: 31, p: 1, c: 6, f: 0.3, fe: 0.4, ca: 7 },
+  { name: "Onion", k: 40, p: 1.1, c: 9, f: 0.1, fe: 0.2, ca: 23 },
+  { name: "Garlic", k: 149, p: 6, c: 33, f: 0.5, fe: 1.7, ca: 181 },
+  { name: "Chilli", k: 40, p: 2, c: 9, f: 0.4, fe: 1, ca: 14 },
+  { name: "Peanut butter", k: 588, p: 25, c: 20, f: 50, fe: 1.9, ca: 49 },
+  { name: "Chia seeds", k: 486, p: 17, c: 42, f: 31, fe: 7.7, ca: 631 },
+  { name: "Flaxseed meal", k: 534, p: 18, c: 29, f: 42, fe: 5.7, ca: 255 },
+  { name: "High-protein yoghurt", k: 60, p: 10, c: 4, f: 0.2, fe: 0, ca: 120 },
+  { name: "Whey protein powder", k: 380, p: 80, c: 8, f: 5, fe: 0, ca: 200 },
+  { name: "Almond milk (unsweetened)", k: 13, p: 0.5, c: 0.3, f: 1.1, fe: 0.3, ca: 120 },
+  { name: "Olive oil", k: 884, p: 0, c: 0, f: 100, fe: 0, ca: 1 },
+  { name: "Fish sauce", k: 35, p: 5, c: 4, f: 0, fe: 0.7, ca: 43 },
+  { name: "Coconut milk", k: 230, p: 2.3, c: 6, f: 24, fe: 1.6, ca: 16 },
 ];
-const NUT_FIELDS = [["k", "kcal"], ["p", "Protein g"], ["c", "Carbs g"], ["f", "Fat g"], ["fe", "Iron mg"], ["vd", "Vit D µg"]];
+const NUT_FIELDS = [["k", "kcal"], ["p", "Protein g"], ["f", "Fat g"], ["c", "Carbs g"], ["fe", "Iron mg"], ["ca", "Calcium mg"]];
 
 /* mood vocabulary matches the strength app's `feeling`: Rough / OK / Good / Strong ("—" = unset) */
 const MOODS = [
@@ -142,19 +142,19 @@ function EnergyBars({ level, onBleed }) {
   );
 }
 
-const blankIng = () => ({ name: "", g: "", k: "", p: "", c: "", f: "", fe: "", vd: "", price: "" });
+const blankIng = () => ({ name: "", g: "", k: "", p: "", c: "", f: "", fe: "", ca: "", price: "" });
 const normIng = (i) => i.g != null
-  ? { name: i.name || "", g: i.g, k: +i.k || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, vd: +i.vd || 0, price: i.price || "" }
-  : { name: i.name || "", g: 100, k: +(i.k ?? i.kcal) || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, vd: +i.vd || 0, price: "" };
+  ? { name: i.name || "", g: i.g, k: +i.k || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, ca: +i.ca || 0, price: i.price || "" }
+  : { name: i.name || "", g: 100, k: +(i.k ?? i.kcal) || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, ca: +i.ca || 0, price: "" };
 
 const calc = (r) => {
   const s = r.servings || 1;
-  const t = { kcal: 0, p: 0, c: 0, f: 0, vd: 0, fe: 0, cost: 0 };
+  const t = { kcal: 0, p: 0, c: 0, f: 0, ca: 0, fe: 0, cost: 0 };
   (r.ing || []).forEach((i) => {
     const factor = i.g != null ? (+i.g || 0) / 100 : 1;
     t.kcal += (+(i.k ?? i.kcal) || 0) * factor;
     t.p += (+i.p || 0) * factor; t.c += (+i.c || 0) * factor; t.f += (+i.f || 0) * factor;
-    t.vd += (+i.vd || 0) * factor; t.fe += (+i.fe || 0) * factor;
+    t.ca += (+i.ca || 0) * factor; t.fe += (+i.fe || 0) * factor;
     t.cost += (+i.price || 0) * (+i.g || 0) / 1000;
   });
   const o = {}; for (const k in t) o[k] = t[k] / s; return o;
@@ -162,21 +162,21 @@ const calc = (r) => {
 
 const DEFAULT_MEALS = [
   { id: "m1", name: "Breakfast bowl", servings: 1, steps: "", ing: [
-    { name: "High-protein yoghurt", g: 170, k: 60, p: 10, c: 4, f: 0.2, fe: 0, vd: 0 },
-    { name: "Whey protein powder", g: 30, k: 380, p: 80, c: 8, f: 5, fe: 0, vd: 0 },
-    { name: "Mixed berries", g: 40, k: 50, p: 1, c: 12, f: 0.3, fe: 0.4, vd: 0 },
-    { name: "Apple", g: 50, k: 52, p: 0.3, c: 14, f: 0.2, fe: 0.1, vd: 0 },
-    { name: "Chia seeds", g: 7, k: 486, p: 17, c: 42, f: 31, fe: 7.7, vd: 0 },
-    { name: "Flaxseed meal", g: 5, k: 534, p: 18, c: 29, f: 42, fe: 5.7, vd: 0 },
+    { name: "High-protein yoghurt", g: 170, k: 60, p: 10, c: 4, f: 0.2, fe: 0, ca: 0 },
+    { name: "Whey protein powder", g: 30, k: 380, p: 80, c: 8, f: 5, fe: 0, ca: 0 },
+    { name: "Mixed berries", g: 40, k: 50, p: 1, c: 12, f: 0.3, fe: 0.4, ca: 0 },
+    { name: "Apple", g: 50, k: 52, p: 0.3, c: 14, f: 0.2, fe: 0.1, ca: 0 },
+    { name: "Chia seeds", g: 7, k: 486, p: 17, c: 42, f: 31, fe: 7.7, ca: 0 },
+    { name: "Flaxseed meal", g: 5, k: 534, p: 18, c: 29, f: 42, fe: 5.7, ca: 0 },
   ] },
   { id: "m2", name: "Thai lunch — chicken, rice & veg", servings: 1, steps: "", ing: [
-    { name: "Chicken breast (raw)", g: 200, k: 106, p: 23, c: 0, f: 1.5, fe: 0.7, vd: 0 },
-    { name: "Jasmine rice (cooked)", g: 120, k: 130, p: 2.7, c: 28, f: 0.3, fe: 0.2, vd: 0 },
-    { name: "Bok choy / Asian greens", g: 150, k: 13, p: 1.5, c: 2, f: 0.2, fe: 0.8, vd: 0 },
-    { name: "Olive oil", g: 8, k: 884, p: 0, c: 0, f: 100, fe: 0, vd: 0 },
+    { name: "Chicken breast (raw)", g: 200, k: 106, p: 23, c: 0, f: 1.5, fe: 0.7, ca: 0 },
+    { name: "Jasmine rice (cooked)", g: 120, k: 130, p: 2.7, c: 28, f: 0.3, fe: 0.2, ca: 0 },
+    { name: "Bok choy / Asian greens", g: 150, k: 13, p: 1.5, c: 2, f: 0.2, fe: 0.8, ca: 0 },
+    { name: "Olive oil", g: 8, k: 884, p: 0, c: 0, f: 100, fe: 0, ca: 0 },
   ] },
 ];
-const DEFAULT_SETTINGS = { restTarget: 1900, trainTarget: 2100, proteinTarget: 125, currency: "$", cycleLength: 26 };
+const DEFAULT_SETTINGS = { restTarget: 1900, trainTarget: 2100, proteinTarget: 125, currency: "$", cycleLength: 26, calciumTarget: 1000, weightKg: 60.8, bodyFatPct: 22.9, ffmKg: 46.9, activityFactor: 1.6 };
 
 function cyclePhase(day) {
   if (day == null) return null;
@@ -301,8 +301,8 @@ function Today({ log, saveLog, meals, settings, phase, cycleDay, viewDate, goToD
 
   const totals = log.entries.reduce((a, e) => ({
     kcal: a.kcal + e.kcal * e.qty, p: a.p + e.p * e.qty, c: a.c + e.c * e.qty,
-    f: a.f + e.f * e.qty, vd: a.vd + (e.vd || 0) * e.qty, fe: a.fe + (e.fe || 0) * e.qty,
-  }), { kcal: 0, p: 0, c: 0, f: 0, vd: 0, fe: 0 });
+    f: a.f + e.f * e.qty, ca: a.ca + (e.ca || 0) * e.qty, fe: a.fe + (e.fe || 0) * e.qty,
+  }), { kcal: 0, p: 0, c: 0, f: 0, ca: 0, fe: 0 });
   const target = training ? settings.trainTarget : settings.restTarget;
   const kcalPct = target ? totals.kcal / target : 0;
   const proPct = settings.proteinTarget ? totals.p / settings.proteinTarget : 0;
@@ -356,9 +356,11 @@ function Today({ log, saveLog, meals, settings, phase, cycleDay, viewDate, goToD
       </div>
 
       <div className="bg-white rounded-2xl border border-stone-200 p-4">
-        <h2 className="text-sm font-medium text-stone-500 flex items-center gap-1 mb-1"><Droplet size={15} /> Micronutrient guide</h2>
-        <div className="flex gap-6 text-sm"><span>Vitamin D <b className="text-stone-800">{totals.vd.toFixed(1)} µg</b></span><span>Iron <b className="text-stone-800">{totals.fe.toFixed(1)} mg</b></span></div>
-        <p className="text-xs text-stone-400 mt-2">Directional only — compare the trend against your blood tests over time.</p>
+        <h2 className="text-sm font-medium text-stone-500 flex items-center gap-1 mb-2"><Droplet size={15} /> Micronutrients</h2>
+        <div className="flex justify-between text-sm mb-1"><span className="text-stone-500">Calcium</span><span className="font-medium">{Math.round(totals.ca)} / {settings.calciumTarget} mg</span></div>
+        <div className="h-2 rounded-full bg-stone-200 overflow-hidden"><div className={`h-full ${totals.ca < settings.calciumTarget ? "bg-violet-400" : "bg-violet-500"}`} style={{ width: `${Math.min(100, Math.round(totals.ca / settings.calciumTarget * 100))}%` }} /></div>
+        <div className="flex justify-between text-sm mt-3"><span className="text-stone-500">Iron</span><span className="font-medium">{totals.fe.toFixed(1)} mg</span></div>
+        <p className="text-xs text-stone-400 mt-2">Calcium goal {settings.calciumTarget} mg/day (your GP's number) for bone health. Iron is directional — compare with your blood tests.</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-stone-200 p-4">
@@ -530,7 +532,7 @@ function Recipes({ meals, saveMeals, log, saveLog, settings, foods }) {
                   <span className="font-medium text-stone-800">{Math.round(ps.kcal)} kcal</span>
                   <span>{Math.round(ps.p)}P / {Math.round(ps.c)}C / {Math.round(ps.f)}F</span>
                   {ps.fe > 0 && <span>Iron {ps.fe.toFixed(1)} mg</span>}
-                  {ps.vd > 0 && <span>Vit D {ps.vd.toFixed(1)} µg</span>}
+                  {ps.ca > 0 && <span>Calcium {ps.ca.toFixed(0)} mg</span>}
                   {ps.cost > 0 && <span className="text-violet-700 font-medium">{cur}{ps.cost.toFixed(2)}/serve</span>}
                 </div>
                 <div>
@@ -579,7 +581,7 @@ function RecipeEditor({ recipe, onSave, onCancel, cur, foods }) {
 
       <div className="bg-violet-50 rounded-2xl border border-violet-100 p-3 text-sm text-violet-900 space-y-1">
         <div>Per serving: <b>{Math.round(ps.kcal)} kcal</b> · {Math.round(ps.p)}P / {Math.round(ps.c)}C / {Math.round(ps.f)}F</div>
-        <div className="text-xs">Iron {ps.fe.toFixed(1)} mg · Vit D {ps.vd.toFixed(1)} µg{ps.cost > 0 ? ` · ${cur}${ps.cost.toFixed(2)}/serve` : ""}</div>
+        <div className="text-xs">Iron {ps.fe.toFixed(1)} mg · Calcium {ps.ca.toFixed(0)} mg{ps.cost > 0 ? ` · ${cur}${ps.cost.toFixed(2)}/serve` : ""}</div>
       </div>
       <button onClick={() => r.name && onSave(r)} className="w-full py-2.5 rounded-2xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Check size={16} /> Save recipe</button>
     </div>
@@ -593,9 +595,9 @@ function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
   const ccost = (+ig.price || 0) * (+ig.g || 0) / 1000;
   const inList = foods.some((x) => x.name === ig.name);
   const pick = (name) => {
-    if (name === "__custom") { onChange({ name: "", k: "", p: "", c: "", f: "", fe: "", vd: "" }); setOpen(true); return; }
+    if (name === "__custom") { onChange({ name: "", k: "", p: "", c: "", f: "", fe: "", ca: "" }); setOpen(true); return; }
     const f = foods.find((x) => x.name === name);
-    if (f) onChange({ name: f.name, k: f.k, p: f.p, c: f.c, f: f.f, fe: f.fe, vd: f.vd });
+    if (f) onChange({ name: f.name, k: f.k, p: f.p, c: f.c, f: f.f, fe: f.fe, ca: f.ca });
   };
   return (
     <div className="border border-stone-100 rounded-xl p-2 space-y-2">
@@ -626,8 +628,8 @@ function IngredientDB({ foods, customFoods, saveCustomFoods }) {
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("");
   const shown = foods.filter((f) => f.name.toLowerCase().includes(filter.toLowerCase()));
-  const startNew = () => setEditing({ name: "", k: "", p: "", c: "", f: "", fe: "", vd: "", isNew: true });
-  const saveFood = (f) => { saveCustomFoods([...customFoods.filter((c) => c.name !== f.name), { name: f.name, k: +f.k || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, vd: +f.vd || 0 }]); setEditing(null); };
+  const startNew = () => setEditing({ name: "", k: "", p: "", c: "", f: "", fe: "", ca: "", isNew: true });
+  const saveFood = (f) => { saveCustomFoods([...customFoods.filter((c) => c.name !== f.name), { name: f.name, k: +f.k || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, ca: +f.ca || 0 }]); setEditing(null); };
   const removeOverride = (name) => saveCustomFoods(customFoods.filter((c) => c.name !== name));
 
   if (editing) {
@@ -660,7 +662,7 @@ function IngredientDB({ foods, customFoods, saveCustomFoods }) {
                 {f.source === "custom" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">yours</span>}
                 {f.source === "edited" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">edited</span>}
               </p>
-              <p className="text-xs text-stone-400">{f.k} kcal · {f.p}P / {f.c}C / {f.f}F · Fe {f.fe} · D {f.vd} (per 100 g)</p>
+              <p className="text-xs text-stone-400">{f.k} kcal · {f.p}P / {f.c}C / {f.f}F · Fe {f.fe} · Ca {f.ca} (per 100 g)</p>
             </div>
             <button onClick={() => setEditing({ ...f })} className="p-1.5 text-stone-400 hover:text-violet-600"><Pencil size={15} /></button>
             {f.source !== "builtin" && <button onClick={() => removeOverride(f.name)} className="p-1.5 text-stone-300 hover:text-rose-400"><Trash2 size={15} /></button>}
@@ -798,21 +800,78 @@ function Cycle({ checkins, saveCheckin, dateK, settings }) {
 
 /* ============ SETTINGS ============ */
 function SettingsModal({ settings, saveSettings, onClose }) {
-  const [s, setS] = useState(settings);
+  const [s, setS] = useState(() => ({ ...settings, weightKg: lget("sl:weight", settings.weightKg) }));
+  const num = (v) => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+
+  /* lean-mass method (Katch-McArdle): uses fat-free mass only */
+  const ffm = num(s.ffmKg) > 0 ? num(s.ffmKg) : num(s.weightKg) * (1 - num(s.bodyFatPct) / 100);
+  const bmr = ffm > 0 ? Math.round(370 + 21.6 * ffm) : 0;
+  const tdee = bmr > 0 ? Math.round(bmr * (num(s.activityFactor) || 1.6)) : 0;
+  const r10 = (x) => Math.round(x / 10) * 10;
+  const suggRest = tdee ? r10(tdee - 100) : 0;
+  const suggTrain = tdee ? r10(tdee + 100) : 0;
+
   const Row = ({ k, label }) => (
     <div className="flex items-center justify-between"><span className="text-sm text-stone-600">{label}</span>
       <input type="number" value={s[k]} onChange={(e) => setS({ ...s, [k]: +e.target.value })} className="w-24 px-3 py-2 rounded-xl border border-stone-200 text-sm text-right" /></div>
   );
+  const Bio = ({ k, label, hint, step }) => (
+    <div>
+      <div className="flex items-center justify-between"><span className="text-sm text-stone-600">{label}</span>
+        <input type="number" step={step || "1"} value={s[k] ?? ""} onChange={(e) => setS({ ...s, [k]: e.target.value })} className="w-24 px-3 py-2 rounded-xl border border-stone-200 text-sm text-right" /></div>
+      {hint && <p className="text-[11px] text-stone-400 mt-0.5 leading-snug">{hint}</p>}
+    </div>
+  );
+
+  const save = () => {
+    const clean = { ...s, weightKg: num(s.weightKg), bodyFatPct: num(s.bodyFatPct), ffmKg: num(s.ffmKg), activityFactor: num(s.activityFactor) || 1.6 };
+    saveSettings(clean);
+    if (clean.weightKg > 0) lset("sl:weight", clean.weightKg); // keep strength app's burn estimate in step (this device)
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-10 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl p-5 w-full max-w-sm space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between"><h2 className="text-lg font-medium">Settings</h2><button onClick={onClose} className="p-1 text-stone-400"><X size={20} /></button></div>
-        <Row k="restTarget" label="Rest-day calories" />
-        <Row k="trainTarget" label="Training-day calories" />
-        <Row k="proteinTarget" label="Protein target (g)" />
-        <Row k="cycleLength" label="Usual cycle length (days)" />
-        <p className="text-xs text-stone-400">Everything saves automatically. Defaults are estimates (~2,000 anchor); adjust by how strength, energy and sleep respond. Rest vs training day is detected from your strength log.</p>
-        <button onClick={() => { saveSettings(s); onClose(); }} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium hover:bg-violet-300">Save</button>
+
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-stone-700">Body &amp; energy</h3>
+          {Bio({ k: "weightKg", label: "Weight (kg)", step: "0.1", hint: "Also updates the weight your strength app uses for burn estimates." })}
+          {Bio({ k: "bodyFatPct", label: "Body fat (%)", step: "0.1" })}
+          {Bio({ k: "ffmKg", label: "Fat-free mass (kg)", step: "0.1", hint: "From your InBody. Leave at 0 to estimate it from weight and body fat." })}
+
+          <div className="rounded-xl bg-violet-50 border border-violet-100 p-3 space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-stone-500">Fat-free mass</span><span>{ffm ? ffm.toFixed(1) : "—"} kg</span></div>
+            <div className="flex justify-between"><span className="text-stone-500">Resting burn</span><span>{bmr || "—"} kcal</span></div>
+            <div className="flex justify-between"><span className="text-stone-500">Est. maintenance</span><span className="font-medium text-stone-800">{tdee || "—"} kcal</span></div>
+            <div className="flex justify-between pt-1"><span className="text-stone-500">Suggested rest / training</span><span>{suggRest || "—"} / {suggTrain || "—"}</span></div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">Activity level</label>
+            <select value={String(s.activityFactor)} onChange={(e) => setS({ ...s, activityFactor: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm bg-white">
+              <option value="1.45">Lighter training weeks</option>
+              <option value="1.55">Moderately active</option>
+              <option value="1.6">Typical — your ~6-day week</option>
+              <option value="1.7">Very active stretch</option>
+            </select>
+          </div>
+
+          <button onClick={() => setS({ ...s, restTarget: suggRest, trainTarget: suggTrain })} disabled={!tdee} className="w-full py-2 rounded-xl border border-violet-200 text-violet-800 text-sm hover:bg-violet-50 disabled:opacity-40">Use these as my targets</button>
+          <p className="text-[11px] text-stone-400 leading-snug">Resting burn uses the lean-mass method (Katch-McArdle) from your fat-free mass — more accurate for you than generic formulas. Maintenance is an estimate: calibrate it against your weight trend over 2–3 weeks, and lock precise numbers with your dietitian at the July scan.</p>
+        </div>
+
+        <div className="space-y-3 pt-3 border-t border-stone-100">
+          {Row({ k: "restTarget", label: "Rest-day calories" })}
+          {Row({ k: "trainTarget", label: "Training-day calories" })}
+          {Row({ k: "proteinTarget", label: "Protein target (g)" })}
+          {Row({ k: "cycleLength", label: "Usual cycle length (days)" })}
+          {Row({ k: "calciumTarget", label: "Calcium target (mg)" })}
+        </div>
+
+        <p className="text-xs text-stone-400">Everything saves on Save. Rest vs training day is detected from your strength log.</p>
+        <button onClick={save} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium hover:bg-violet-300">Save</button>
       </div>
     </div>
   );
