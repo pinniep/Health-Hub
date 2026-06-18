@@ -205,11 +205,15 @@ function App() {
   const [viewDate, setViewDate] = useState(todayKey());
   const [checkins, setCheckins] = useState({});
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [lego, setLego] = useState({ ings: [], recipes: [] });
+  const [hiddenFoods, setHiddenFoods] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     setMeals(lget("food:meal-library", DEFAULT_MEALS));
     setCustomFoods(lget("food:custom-foods", []));
+    setLego(lget("food:lego", { ings: [], recipes: [] }));
+    setHiddenFoods(lget("food:hidden-foods", []));
     setSettings({ ...DEFAULT_SETTINGS, ...lget("food:settings", DEFAULT_SETTINGS) });
     setCheckins(lget(CHECKINS, {}));
     const t = todayKey();
@@ -226,16 +230,26 @@ function App() {
   };
   const saveMeals = (n) => { setMeals(n); lset("food:meal-library", n); };
   const saveCustomFoods = (n) => { setCustomFoods(n); lset("food:custom-foods", n); };
+  const saveLego = (n) => { setLego(n); lset("food:lego", n); };
+  const toggleLegoIng = (name) => saveLego({ ...lego, ings: lego.ings.includes(name) ? lego.ings.filter((x) => x !== name) : [...lego.ings, name] });
+  const toggleLegoRecipe = (id) => saveLego({ ...lego, recipes: lego.recipes.includes(id) ? lego.recipes.filter((x) => x !== id) : [...lego.recipes, id] });
+  const saveHidden = (n) => { setHiddenFoods(n); lset("food:hidden-foods", n); };
+  const hideFood = (name) => saveHidden(hiddenFoods.includes(name) ? hiddenFoods : [...hiddenFoods, name]);
+  const unhideAll = () => saveHidden([]);
   const saveSettings = (n) => { setSettings(n); lset("food:settings", n); };
   /* merge-on-save into the shared record, then refresh local state */
   const saveCheckin = (date, patch) => { const all = mergeCheckin(date, patch); setCheckins({ ...all }); };
 
+  const hiddenSet = new Set(hiddenFoods);
   const mergedFoods = (() => {
     const map = new Map();
     FOODS.forEach((f) => map.set(f.name, { ...f, source: "builtin" }));
     customFoods.forEach((f) => map.set(f.name, { ...f, source: FOODS.some((b) => b.name === f.name) ? "edited" : "custom" }));
-    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(map.values())
+      .filter((f) => !(f.source === "builtin" && hiddenSet.has(f.name)))
+      .sort((a, b) => a.name.localeCompare(b.name));
   })();
+  const hideAllBuiltins = () => saveHidden(Array.from(new Set([...hiddenFoods, ...mergedFoods.filter((f) => f.source === "builtin").map((f) => f.name)])));
 
   /* cycle derived from shared check-ins where bleed === "Bleeding" */
   const bleedDays = Object.keys(checkins).filter((d) => checkins[d] && checkins[d].bleed === "Bleeding").sort();
@@ -270,9 +284,9 @@ function App() {
           ))}
         </div>
 
-        {tab === "today" && <Today log={log} saveLog={saveLog} meals={meals} foods={mergedFoods} settings={settings} phase={phase} cycleDay={cycleDay} viewDate={viewDate} goToDate={goToDate} checkins={checkins} saveCheckin={saveCheckin} />}
+        {tab === "today" && <Today log={log} saveLog={saveLog} meals={meals} foods={mergedFoods} lego={lego} settings={settings} phase={phase} cycleDay={cycleDay} viewDate={viewDate} goToDate={goToDate} checkins={checkins} saveCheckin={saveCheckin} />}
         {tab === "week" && <Week settings={settings} goToDate={goToDate} setTab={setTab} />}
-        {tab === "meals" && <Meals meals={meals} saveMeals={saveMeals} log={log} saveLog={saveLog} settings={settings} foods={mergedFoods} customFoods={customFoods} saveCustomFoods={saveCustomFoods} />}
+        {tab === "meals" && <Meals meals={meals} saveMeals={saveMeals} log={log} saveLog={saveLog} settings={settings} foods={mergedFoods} customFoods={customFoods} saveCustomFoods={saveCustomFoods} lego={lego} toggleLegoIng={toggleLegoIng} toggleLegoRecipe={toggleLegoRecipe} hideFood={hideFood} hideAllBuiltins={hideAllBuiltins} unhideAll={unhideAll} hiddenCount={hiddenFoods.length} />}
         {tab === "cycle" && <Cycle checkins={checkins} saveCheckin={saveCheckin} dateK={todayKey()} settings={settings} />}
       </div>
 
@@ -282,44 +296,64 @@ function App() {
 }
 
 /* ============ TODAY ============ */
-function Today({ log, saveLog, meals, foods, settings, phase, cycleDay, viewDate, goToDate, checkins, saveCheckin }) {
+function Today({ log, saveLog, meals, foods, lego, settings, phase, cycleDay, viewDate, goToDate, checkins, saveCheckin }) {
   const isToday = viewDate === todayKey();
   const training = isTrainingDay(viewDate);
   const ck = checkins[viewDate] || {};
-  const [plate, setPlate] = useState(null); // { name:"", ings:[{name,g,k,p,c,f,fe,ca}] }
-  const [ingDraft, setIngDraft] = useState({ name: "", g: "" });
+  const [plate, setPlate] = useState(null); // { name:"", items:[{t:'i'|'r', ...}] }
+  const [draft, setDraft] = useState({ sel: "", amt: "" });
   const [snack, setSnack] = useState(null); // { name, kcal, p }
   const setEnergy = (k) => saveCheckin(viewDate, { energy: ck.energy === k ? "—" : k });
   const setMood = (k) => saveCheckin(viewDate, { feeling: ck.feeling === k ? "—" : k });
+
+  const legoFoods = (foods || []).filter((f) => ((lego || {}).ings || []).includes(f.name));
+  const legoRecipes = (meals || []).filter((m) => ((lego || {}).recipes || []).includes(m.id));
 
   /* macros for an ingredient at a given gram weight (library values are per 100 g) */
   const ingMacros = (f, g) => {
     const factor = (+g || 0) / 100;
     return { kcal: (+(f.k ?? f.kcal) || 0) * factor, p: (+f.p || 0) * factor, c: (+f.c || 0) * factor, f: (+f.f || 0) * factor, fe: (+f.fe || 0) * factor, ca: (+f.ca || 0) * factor };
   };
-  const addIngToPlate = () => {
-    const f = (foods || []).find((x) => x.name === ingDraft.name);
-    const g = +ingDraft.g;
-    if (!f || !(g > 0)) return;
-    setPlate((p) => ({ ...p, ings: [...(p.ings || []), { name: f.name, g, k: +(f.k ?? f.kcal) || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, ca: +f.ca || 0 }] }));
-    setIngDraft({ name: "", g: "" });
+  const itemMacros = (it) => {
+    if (it.t === "r") {
+      const m = (meals || []).find((x) => x.id === it.id);
+      if (!m) return { kcal: 0, p: 0, c: 0, f: 0, fe: 0, ca: 0 };
+      const ps = calc(m); const q = +it.qty || 1;
+      return { kcal: ps.kcal * q, p: ps.p * q, c: ps.c * q, f: ps.f * q, fe: ps.fe * q, ca: ps.ca * q };
+    }
+    return ingMacros(it, it.g);
   };
-  const removeIngFromPlate = (idx) => setPlate((p) => ({ ...p, ings: (p.ings || []).filter((_, i) => i !== idx) }));
+  const itemLabel = (it) => it.t === "r" ? `${it.name}${(+it.qty || 1) !== 1 ? ` ×${it.qty}` : ""}` : `${it.name} · ${it.g} g`;
+
+  const addItem = () => {
+    const { sel, amt } = draft;
+    if (sel.startsWith("r:")) {
+      const m = (meals || []).find((x) => x.id === sel.slice(2)); if (!m) return;
+      setPlate((p) => ({ ...p, items: [...(p.items || []), { t: "r", id: m.id, name: m.name, qty: +amt || 1 }] }));
+      setDraft({ sel: "", amt: "" });
+    } else if (sel.startsWith("i:")) {
+      const f = (foods || []).find((x) => x.name === sel.slice(2)); const g = +amt;
+      if (!f || !(g > 0)) return;
+      setPlate((p) => ({ ...p, items: [...(p.items || []), { t: "i", name: f.name, g, k: +(f.k ?? f.kcal) || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, ca: +f.ca || 0 }] }));
+      setDraft({ sel: "", amt: "" });
+    }
+  };
+  const removeItem = (idx) => setPlate((p) => ({ ...p, items: (p.items || []).filter((_, i) => i !== idx) }));
 
   const addPlate = () => {
-    const ings = plate.ings || [];
-    if (ings.length === 0) { setPlate(null); return; }
+    const items = plate.items || [];
+    if (items.length === 0) { setPlate(null); return; }
     const name = (plate.name || "").trim();
     const entries = [...log.entries];
     if (name) {
-      const sum = ings.reduce((a, i) => { const m = ingMacros(i, i.g); return { kcal: a.kcal + m.kcal, p: a.p + m.p, c: a.c + m.c, f: a.f + m.f, fe: a.fe + m.fe, ca: a.ca + m.ca }; }, { kcal: 0, p: 0, c: 0, f: 0, fe: 0, ca: 0 });
+      const sum = items.reduce((a, it) => { const m = itemMacros(it); return { kcal: a.kcal + m.kcal, p: a.p + m.p, c: a.c + m.c, f: a.f + m.f, fe: a.fe + m.fe, ca: a.ca + m.ca }; }, { kcal: 0, p: 0, c: 0, f: 0, fe: 0, ca: 0 });
       entries.push({ name, ...sum, qty: 1, uid: Date.now() + Math.random() });
     } else {
-      ings.forEach((i) => entries.push({ name: `${i.name} · ${i.g} g`, ...ingMacros(i, i.g), qty: 1, uid: Date.now() + Math.random() }));
+      items.forEach((it) => entries.push({ name: itemLabel(it), ...itemMacros(it), qty: 1, uid: Date.now() + Math.random() }));
     }
     saveLog({ ...log, entries });
     setPlate(null);
-    setIngDraft({ name: "", g: "" });
+    setDraft({ sel: "", amt: "" });
   };
 
   const addSnack = () => {
@@ -426,7 +460,7 @@ function Today({ log, saveLog, meals, foods, settings, phase, cycleDay, viewDate
             <p className="text-xs text-stone-400">Quick add</p>
             <div className="flex gap-2">
               <button onClick={() => setSnack({ name: "", kcal: "", p: "" })} className="text-xs px-3 py-1 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-200">+ Snack</button>
-              <button onClick={() => setPlate({ ings: [], name: "" })} className="text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200">Build a plate</button>
+              <button onClick={() => setPlate({ items: [], name: "" })} className="text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200">Build a plate</button>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -445,32 +479,44 @@ function Today({ log, saveLog, meals, foods, settings, phase, cycleDay, viewDate
 
             <div>
               <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">Dish name <span className="normal-case tracking-normal text-stone-300">(optional)</span></label>
-              <input value={plate.name || ""} onChange={(e) => setPlate({ ...plate, name: e.target.value })} placeholder="e.g. Chicken stir-fry" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
-              <p className="text-[11px] text-stone-400 mt-1">Name it to log as one tidy line, or leave blank to add each ingredient separately.</p>
+              <input value={plate.name || ""} onChange={(e) => setPlate({ ...plate, name: e.target.value })} placeholder="e.g. Lego stir-fry bowl" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+              <p className="text-[11px] text-stone-400 mt-1">Name it to log as one tidy line, or leave blank to add each piece separately.</p>
             </div>
 
             <div className="pt-1 border-t border-stone-100">
-              <p className="text-[11px] uppercase tracking-wide text-stone-400 mb-2 mt-2">Ingredients</p>
-              {(plate.ings || []).map((i, idx) => (
+              <p className="text-[11px] uppercase tracking-wide text-stone-400 mb-2 mt-2">Pieces</p>
+              {(plate.items || []).map((it, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-sm mb-1">
-                  <span className="flex-1">{i.name} · {i.g} g</span>
-                  <span className="text-stone-400 w-14 text-right">{Math.round(ingMacros(i, i.g).kcal)} kcal</span>
-                  <button onClick={() => removeIngFromPlate(idx)} className="p-1 rounded-lg hover:bg-rose-50 text-rose-400"><Trash2 size={14} /></button>
+                  <span className="flex-1">{itemLabel(it)}{it.t === "r" && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-violet-50 text-violet-500 align-middle">recipe</span>}</span>
+                  <span className="text-stone-400 w-14 text-right">{Math.round(itemMacros(it).kcal)} kcal</span>
+                  <button onClick={() => removeItem(idx)} className="p-1 rounded-lg hover:bg-rose-50 text-rose-400"><Trash2 size={14} /></button>
                 </div>
               ))}
-              <div className="flex items-center gap-2 mt-1">
-                <select value={ingDraft.name} onChange={(e) => setIngDraft({ ...ingDraft, name: e.target.value })} className="flex-1 min-w-0 px-2 py-2 rounded-xl border border-stone-200 text-sm bg-white">
-                  <option value="">Pick an ingredient…</option>
-                  {(foods || []).map((f) => <option key={f.name} value={f.name}>{f.name}</option>)}
-                </select>
-                <input type="number" inputMode="decimal" placeholder="g" value={ingDraft.g} onChange={(e) => setIngDraft({ ...ingDraft, g: e.target.value })} className="w-14 px-2 py-2 rounded-xl border border-stone-200 text-sm text-right" />
-                <button onClick={addIngToPlate} disabled={!ingDraft.name || !(+ingDraft.g > 0)} className="p-2 rounded-xl bg-violet-100 text-violet-700 disabled:opacity-40"><Plus size={16} /></button>
-              </div>
-              {ingDraft.name && +ingDraft.g > 0 && (() => { const f = (foods || []).find((x) => x.name === ingDraft.name); if (!f) return null; const mac = ingMacros(f, ingDraft.g); return <p className="text-[11px] text-stone-400 mt-1">≈ {Math.round(mac.kcal)} kcal · {Math.round(mac.p)} g protein for {ingDraft.g} g</p>; })()}
-              <p className="text-[11px] text-stone-400 mt-1">Don't see an ingredient? Add it on the Meals tab and it'll appear here.</p>
+              {(legoRecipes.length || legoFoods.length) ? (
+                <>
+                  <div className="flex items-center gap-2 mt-1">
+                    <select value={draft.sel} onChange={(e) => setDraft({ sel: e.target.value, amt: e.target.value.startsWith("r:") ? "1" : "" })} className="flex-1 min-w-0 px-2 py-2 rounded-xl border border-stone-200 text-sm bg-white">
+                      <option value="">Add a piece…</option>
+                      {legoRecipes.length > 0 && <optgroup label="Recipes">{legoRecipes.map((m) => <option key={m.id} value={"r:" + m.id}>{m.name}</option>)}</optgroup>}
+                      {legoFoods.length > 0 && <optgroup label="Ingredients">{legoFoods.map((f) => <option key={f.name} value={"i:" + f.name}>{f.name}</option>)}</optgroup>}
+                    </select>
+                    <input type="number" inputMode="decimal" placeholder={draft.sel.startsWith("r:") ? "serv" : "g"} value={draft.amt} onChange={(e) => setDraft({ ...draft, amt: e.target.value })} className="w-14 px-2 py-2 rounded-xl border border-stone-200 text-sm text-right" />
+                    <button onClick={addItem} disabled={!draft.sel || (draft.sel.startsWith("i:") && !(+draft.amt > 0))} className="p-2 rounded-xl bg-violet-100 text-violet-700 disabled:opacity-40"><Plus size={16} /></button>
+                  </div>
+                  {draft.sel && (() => {
+                    let mac = null, unit = "";
+                    if (draft.sel.startsWith("i:")) { const f = (foods || []).find((x) => x.name === draft.sel.slice(2)); if (f && +draft.amt > 0) { mac = ingMacros(f, draft.amt); unit = `${draft.amt} g`; } }
+                    else if (draft.sel.startsWith("r:")) { const m = (meals || []).find((x) => x.id === draft.sel.slice(2)); if (m) { const ps = calc(m); const q = +draft.amt || 1; mac = { kcal: ps.kcal * q, p: ps.p * q }; unit = `${q} serving${q !== 1 ? "s" : ""}`; } }
+                    return mac ? <p className="text-[11px] text-stone-400 mt-1">≈ {Math.round(mac.kcal)} kcal · {Math.round(mac.p)} g protein for {unit}</p> : null;
+                  })()}
+                  <p className="text-[11px] text-stone-400 mt-1">Recipes add by serving, ingredients by grams.</p>
+                </>
+              ) : (
+                <p className="text-[11px] text-stone-400 mt-1">No pieces tagged yet. On the Meals and Ingredients tabs, tap "+ plate" on the recipes and ingredients you want to mix and match here.</p>
+              )}
             </div>
 
-            <button onClick={addPlate} disabled={!(plate.ings || []).length} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium mt-1 hover:bg-violet-300 disabled:opacity-40">Add to {isToday ? "today" : "this day"}</button>
+            <button onClick={addPlate} disabled={!(plate.items || []).length} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 font-medium mt-1 hover:bg-violet-300 disabled:opacity-40">Add to {isToday ? "today" : "this day"}</button>
           </div>
         </div>
       )}
@@ -567,15 +613,16 @@ function Meals(props) {
           <button key={id} onClick={() => setSub(id)} className={`flex-1 py-1.5 rounded-xl text-sm font-medium ${sub === id ? "bg-amber-100 text-amber-800" : "text-stone-500"}`}>{label}</button>
         ))}
       </div>
-      {sub === "recipes" ? <Recipes {...props} /> : <IngredientDB foods={props.foods} customFoods={props.customFoods} saveCustomFoods={props.saveCustomFoods} />}
+      {sub === "recipes" ? <Recipes {...props} /> : <IngredientDB foods={props.foods} customFoods={props.customFoods} saveCustomFoods={props.saveCustomFoods} cur={props.settings.currency} legoIngs={(props.lego || { ings: [] }).ings} toggleLegoIng={props.toggleLegoIng} hideFood={props.hideFood} hideAllBuiltins={props.hideAllBuiltins} unhideAll={props.unhideAll} hiddenCount={props.hiddenCount} />}
     </div>
   );
 }
 
-function Recipes({ meals, saveMeals, log, saveLog, settings, foods }) {
+function Recipes({ meals, saveMeals, log, saveLog, settings, foods, lego, toggleLegoRecipe }) {
   const [editing, setEditing] = useState(null);
   const [openId, setOpenId] = useState(null);
   const cur = settings.currency || "$";
+  const legoSet = (lego || { recipes: [] }).recipes || [];
   const startNew = () => setEditing({ id: "u" + Date.now(), name: "", servings: 1, steps: "", ing: [blankIng()], isNew: true });
   const editExisting = (m) => setEditing({ ...m, ing: (m.ing || [blankIng()]).map(normIng) });
   const logIt = (m) => { const ps = calc(m); saveLog({ ...log, entries: [...log.entries, { name: m.name, ...ps, qty: 1, uid: Date.now() + Math.random() }] }); };
@@ -596,7 +643,7 @@ function Recipes({ meals, saveMeals, log, saveLog, settings, foods }) {
           <div key={m.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
             <button onClick={() => setOpenId(open ? null : m.id)} className="w-full p-3 flex items-center gap-3 text-left">
               <div className="flex-1">
-                <p className="text-sm font-medium">{m.name}</p>
+                <p className="text-sm font-medium flex items-center gap-1.5">{m.name}{legoSet.includes(m.id) && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700">plate</span>}</p>
                 <p className="text-xs text-stone-400">{Math.round(ps.kcal)} kcal · {Math.round(ps.p)}P / {Math.round(ps.c)}C / {Math.round(ps.f)}F{ps.cost ? ` · ${cur}${ps.cost.toFixed(2)}/serve` : ""}</p>
               </div>
               {open ? <ChevronUp size={16} className="text-stone-400" /> : <ChevronDown size={16} className="text-stone-400" />}
@@ -618,6 +665,7 @@ function Recipes({ meals, saveMeals, log, saveLog, settings, foods }) {
                   </ul>
                 </div>
                 {m.steps && <div><p className="text-xs font-medium text-stone-500 mb-1">Method</p><p className="text-sm text-stone-700 whitespace-pre-wrap">{m.steps}</p></div>}
+                <button onClick={() => toggleLegoRecipe(m.id)} className={`w-full py-2 rounded-xl text-sm font-medium border ${legoSet.includes(m.id) ? "bg-violet-100 border-violet-200 text-violet-700" : "border-stone-200 text-stone-500"}`}>{legoSet.includes(m.id) ? "✓ In your build-a-plate picker" : "Add to build-a-plate picker"}</button>
                 <div className="flex gap-2 pt-1">
                   <button onClick={() => logIt(m)} className="flex-1 py-2 rounded-xl bg-violet-50 text-violet-700 text-sm font-medium">Log to this day</button>
                   <button onClick={() => editExisting(m)} className="px-3 py-2 rounded-xl border border-stone-200 text-sm flex items-center gap-1"><Pencil size={14} /> Edit</button>
@@ -649,7 +697,7 @@ function RecipeEditor({ recipe, onSave, onCancel, cur, foods }) {
           <input value={r.servings} onChange={(e) => setR({ ...r, servings: +e.target.value || 1 })} type="number" className="w-16 px-2 py-1.5 rounded-lg border border-stone-200 text-sm text-center" />
           <span className="text-sm text-stone-500">serving(s)</span>
         </div>
-        <p className="text-xs text-stone-400">Pick each ingredient from the list and type the grams. Nutrition fills in automatically — add a price per kg for cost. Manage the list under the Ingredients tab.</p>
+        <p className="text-xs text-stone-400">Pick each ingredient and type the grams — nutrition and price fill in automatically from the ingredient. Set or change prices on the Ingredients tab.</p>
         <div className="space-y-2">{r.ing.map((ig, i) => <IngredientRow key={i} ig={ig} cur={cur} foods={foods} onChange={(patch) => setIng(i, patch)} onDelete={() => delIng(i)} />)}</div>
         <button onClick={addIng} className="w-full py-2 rounded-xl border border-stone-200 text-sm text-stone-600 flex items-center justify-center gap-1"><Plus size={14} /> Ingredient</button>
         <textarea value={r.steps || ""} onChange={(e) => setR({ ...r, steps: e.target.value })} placeholder="Method (optional) — one step per line" rows={3} className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
@@ -673,7 +721,7 @@ function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
   const pick = (name) => {
     if (name === "__custom") { onChange({ name: "", k: "", p: "", c: "", f: "", fe: "", ca: "" }); setOpen(true); return; }
     const f = foods.find((x) => x.name === name);
-    if (f) onChange({ name: f.name, k: f.k, p: f.p, c: f.c, f: f.f, fe: f.fe, ca: f.ca });
+    if (f) onChange({ name: f.name, k: f.k, p: f.p, c: f.c, f: f.f, fe: f.fe, ca: f.ca, price: f.price ?? "" });
   };
   return (
     <div className="border border-stone-100 rounded-xl p-2 space-y-2">
@@ -688,10 +736,9 @@ function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
       {!inList && <input value={ig.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Ingredient name" className="w-full px-2 py-1.5 rounded-lg border border-stone-200 text-xs" />}
       <div className="flex gap-2">
         <LabeledNum label="Amount (g)" value={ig.g} onChange={(v) => onChange({ g: v })} w="flex-1" />
-        <LabeledNum label={`Price (${cur}/kg)`} value={ig.price} onChange={(v) => onChange({ price: v })} w="flex-1" />
       </div>
       <div className="flex items-center justify-between text-xs">
-        <span className="text-stone-400">→ {ccal} kcal{ccost > 0 ? ` · ${cur}${ccost.toFixed(2)}` : ""}</span>
+        <span className="text-stone-400">→ {ccal} kcal{ccost > 0 ? ` · ${cur}${ccost.toFixed(2)}` : ""}{inList && +ig.price > 0 ? ` · ${cur}${(+ig.price).toFixed(2)}/kg` : ""}</span>
         <button onClick={() => setOpen(!open)} className="text-stone-400 flex items-center gap-1">nutrition / 100 g {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</button>
       </div>
       {open && <div className="grid grid-cols-3 gap-1.5">{NUT_FIELDS.map(([k, label]) => <LabeledNum key={k} label={label} value={ig[k]} onChange={(v) => onChange({ [k]: v })} />)}</div>}
@@ -700,12 +747,14 @@ function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
 }
 
 /* ============ INGREDIENT DATABASE ============ */
-function IngredientDB({ foods, customFoods, saveCustomFoods }) {
+function IngredientDB({ foods, customFoods, saveCustomFoods, cur, legoIngs, toggleLegoIng, hideFood, hideAllBuiltins, unhideAll, hiddenCount }) {
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("");
+  const legoSet = legoIngs || [];
+  const shownBuiltins = foods.filter((f) => f.source === "builtin").length;
   const shown = foods.filter((f) => f.name.toLowerCase().includes(filter.toLowerCase()));
-  const startNew = () => setEditing({ name: "", k: "", p: "", c: "", f: "", fe: "", ca: "", isNew: true });
-  const saveFood = (f) => { saveCustomFoods([...customFoods.filter((c) => c.name !== f.name), { name: f.name, k: +f.k || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, ca: +f.ca || 0 }]); setEditing(null); };
+  const startNew = () => setEditing({ name: "", k: "", p: "", c: "", f: "", fe: "", ca: "", price: "", isNew: true });
+  const saveFood = (f) => { saveCustomFoods([...customFoods.filter((c) => c.name !== f.name), { name: f.name, k: +f.k || 0, p: +f.p || 0, c: +f.c || 0, f: +f.f || 0, fe: +f.fe || 0, ca: +f.ca || 0, price: +f.price || 0 }]); setEditing(null); };
   const removeOverride = (name) => saveCustomFoods(customFoods.filter((c) => c.name !== name));
 
   if (editing) {
@@ -719,6 +768,10 @@ function IngredientDB({ foods, customFoods, saveCustomFoods }) {
         </div>
         <p className="text-xs text-stone-400">Enter the values per 100 g straight from the nutrition label.</p>
         <div className="grid grid-cols-3 gap-2">{NUT_FIELDS.map(([k, label]) => <LabeledNum key={k} label={label} value={e[k]} onChange={(v) => setEditing({ ...e, [k]: v })} />)}</div>
+        <div className="flex items-end gap-2 pt-1">
+          <LabeledNum label={`Price (${cur}/kg)`} value={e.price} onChange={(v) => setEditing({ ...e, price: v })} w="w-28" />
+          <p className="text-[11px] text-stone-400 pb-2 flex-1">Optional. Set it once here and it carries into every recipe automatically.</p>
+        </div>
         <button onClick={() => e.name && saveFood(e)} className="w-full py-2.5 rounded-xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Check size={16} /> Save ingredient</button>
       </div>
     );
@@ -728,23 +781,31 @@ function IngredientDB({ foods, customFoods, saveCustomFoods }) {
     <div className="space-y-3">
       <button onClick={startNew} className="w-full py-2.5 rounded-2xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Plus size={16} /> Add my own ingredient</button>
       <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search ingredients…" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
-      <p className="text-xs text-stone-400">Values are per 100 g. Edit any item to match your own labels — your edits override the defaults. Tap a custom or edited item's bin to revert.</p>
+      <p className="text-xs text-stone-400">Values are per 100 g. Edit any item to match your own labels. Tap "+ plate" to make an ingredient available in Build a plate.</p>
+      {(shownBuiltins > 0 || hiddenCount > 0) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {shownBuiltins > 0 && <button onClick={hideAllBuiltins} className="px-3 py-1.5 rounded-full border border-stone-200 text-stone-500 hover:bg-stone-100">Remove all built-in defaults ({shownBuiltins})</button>}
+          {hiddenCount > 0 && <button onClick={unhideAll} className="px-3 py-1.5 rounded-full border border-stone-200 text-violet-700 hover:bg-violet-50">Restore built-ins ({hiddenCount})</button>}
+        </div>
+      )}
       <div className="space-y-2">
         {shown.map((f) => (
           <div key={f.name} className="bg-white rounded-2xl border border-stone-200 p-3 flex items-center gap-2">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium flex items-center gap-1.5">
                 {f.name}
                 {f.source === "custom" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">yours</span>}
                 {f.source === "edited" && <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-100 text-violet-700">edited</span>}
               </p>
-              <p className="text-xs text-stone-400">{f.k} kcal · {f.p}P / {f.c}C / {f.f}F · Fe {f.fe} · Ca {f.ca} (per 100 g)</p>
+              <p className="text-xs text-stone-400">{f.k} kcal · {f.p}P / {f.c}C / {f.f}F · Fe {f.fe} · Ca {f.ca} (per 100 g){f.price ? ` · ${cur}${(+f.price).toFixed(2)}/kg` : ""}</p>
             </div>
-            <button onClick={() => setEditing({ ...f })} className="p-1.5 text-stone-400 hover:text-violet-600"><Pencil size={15} /></button>
-            {f.source !== "builtin" && <button onClick={() => removeOverride(f.name)} className="p-1.5 text-stone-300 hover:text-rose-400"><Trash2 size={15} /></button>}
+            <button onClick={() => toggleLegoIng(f.name)} className={`px-2 py-1 rounded-lg text-[11px] font-medium shrink-0 ${legoSet.includes(f.name) ? "bg-violet-100 text-violet-700" : "bg-stone-100 text-stone-400"}`}>{legoSet.includes(f.name) ? "✓ plate" : "+ plate"}</button>
+            <button onClick={() => setEditing({ ...f })} className="p-1.5 text-stone-400 hover:text-violet-600 shrink-0"><Pencil size={15} /></button>
+            <button onClick={() => f.source === "builtin" ? hideFood(f.name) : removeOverride(f.name)} className="p-1.5 text-stone-300 hover:text-rose-400 shrink-0" aria-label="Remove"><Trash2 size={15} /></button>
           </div>
         ))}
       </div>
+      <p className="text-[11px] text-stone-400">Removing a built-in just hides it — your own and edited ingredients are never touched, and you can restore the defaults any time.</p>
     </div>
   );
 }
