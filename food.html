@@ -147,7 +147,7 @@ const normIng = (i) => i.g != null
   ? { name: i.name || "", g: i.g, k: +i.k || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, ca: +i.ca || 0, price: i.price || "" }
   : { name: i.name || "", g: 100, k: +(i.k ?? i.kcal) || 0, p: +i.p || 0, c: +i.c || 0, f: +i.f || 0, fe: +i.fe || 0, ca: +i.ca || 0, price: "" };
 
-const calc = (r) => {
+const calc = (r, priceOf) => {
   const s = r.servings || 1;
   const t = { kcal: 0, p: 0, c: 0, f: 0, ca: 0, fe: 0, cost: 0 };
   (r.ing || []).forEach((i) => {
@@ -155,7 +155,9 @@ const calc = (r) => {
     t.kcal += (+(i.k ?? i.kcal) || 0) * factor;
     t.p += (+i.p || 0) * factor; t.c += (+i.c || 0) * factor; t.f += (+i.f || 0) * factor;
     t.ca += (+i.ca || 0) * factor; t.fe += (+i.fe || 0) * factor;
-    t.cost += (+i.price || 0) * (+i.g || 0) / 1000;
+    let unitPrice = +i.price || 0;
+    if (priceOf) { const lp = priceOf(i.name); if (lp != null) unitPrice = +lp || 0; }
+    t.cost += unitPrice * (+i.g || 0) / 1000;
   });
   const o = {}; for (const k in t) o[k] = t[k] / s; return o;
 };
@@ -357,7 +359,8 @@ function Today({ log, saveLog, meals, foods, lego, settings, phase, cycleDay, vi
   };
 
   const addSnack = () => {
-    const kc = +snack.kcal || 0;
+    const raw = +snack.kcal || 0;
+    const kc = snack.unit === "kJ" ? Math.round(raw / 4.184) : raw;
     const name = snack.name.trim() || "Snack";
     saveLog({ ...log, entries: [...log.entries, { name, kcal: kc, p: +snack.p || 0, c: 0, f: 0, fe: 0, ca: 0, qty: 1, snack: true, uid: Date.now() + Math.random() }] });
     setSnack(null);
@@ -380,7 +383,22 @@ function Today({ log, saveLog, meals, foods, lego, settings, phase, cycleDay, vi
   const setQty = (uid, d) => saveLog({ ...log, entries: log.entries.map((e) => e.uid === uid ? { ...e, qty: Math.max(0.5, e.qty + d) } : e) });
   const remove = (uid) => saveLog({ ...log, entries: log.entries.filter((e) => e.uid !== uid) });
 
+  const water = log.water || 0; // glasses of 250 ml; 4 = 1 L per drop, 8 = 2 L goal
+  const setWater = (n) => saveLog({ ...log, water: Math.max(0, Math.min(8, n)) });
+
   const Bar = ({ pct, color }) => <div className="h-2 rounded-full bg-stone-200 overflow-hidden"><div className={`h-full ${color}`} style={{ width: `${Math.min(100, Math.round(pct * 100))}%` }} /></div>;
+  const DROP_PATH = "M12 1.5 C12 1.5 4 12.5 4 18.5 a8 8 0 0 0 16 0 C20 12.5 12 1.5 12 1.5 Z";
+  const WaterDrop = ({ idx, frac }) => {
+    const fillH = Math.max(0, Math.min(1, frac)) * 27;
+    return (
+      <svg viewBox="0 0 24 28" width="62" height="72">
+        <defs><clipPath id={"wd" + idx}><path d={DROP_PATH} /></clipPath></defs>
+        <rect x="0" y="0" width="24" height="28" fill="#e8f1f8" clipPath={`url(#wd${idx})`} />
+        <rect x="0" y={28 - fillH} width="24" height={fillH} fill="#6fb7ec" clipPath={`url(#wd${idx})`} style={{ transition: "y .5s ease, height .5s ease" }} />
+        <path d={DROP_PATH} fill="none" stroke="#a9c7e0" strokeWidth="1" />
+      </svg>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -417,6 +435,28 @@ function Today({ log, saveLog, meals, foods, lego, settings, phase, cycleDay, vi
           <span>Fat <b className="text-stone-700">{Math.round(totals.f)} g</b></span>
           {cycleDay && phase && <span className="ml-auto text-amber-600">{phase.name} · day {cycleDay}</span>}
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-stone-200 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-sm font-medium flex items-center gap-1 text-sky-700"><Droplet size={15} /> Water</h2>
+            <p className="text-xs text-stone-400 mt-0.5">{water} / 8 glasses · {(water * 0.25).toFixed(2)} L of 2 L</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setWater(water - 1)} disabled={water <= 0} className="p-2 rounded-xl hover:bg-stone-100 disabled:opacity-30"><Minus size={16} /></button>
+            <button onClick={() => setWater(water + 1)} disabled={water >= 8} className="px-3 py-2 rounded-xl bg-sky-100 text-sky-700 text-sm font-medium disabled:opacity-40 flex items-center gap-1"><Plus size={14} /> Glass</button>
+          </div>
+        </div>
+        <div className="flex items-end justify-center gap-8">
+          {[0, 1].map((i) => (
+            <button key={i} onClick={() => setWater(water + 1)} disabled={water >= 8} className="flex flex-col items-center gap-1 disabled:cursor-default">
+              <WaterDrop idx={i} frac={(water - i * 4) / 4} />
+              <span className="text-[10px] text-stone-400">1 L</span>
+            </button>
+          ))}
+        </div>
+        {water >= 8 ? <p className="text-xs text-center text-sky-600 mt-2">2 L done — nice work.</p> : <p className="text-[11px] text-center text-stone-400 mt-2">Tap a drop or “Glass” — one tap = one glass (250 ml).</p>}
       </div>
 
       <div className="bg-white rounded-2xl border border-stone-200 p-4">
@@ -459,7 +499,7 @@ function Today({ log, saveLog, meals, foods, lego, settings, phase, cycleDay, vi
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs text-stone-400">Quick add</p>
             <div className="flex gap-2">
-              <button onClick={() => setSnack({ name: "", kcal: "", p: "" })} className="text-xs px-3 py-1 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-200">+ Snack</button>
+              <button onClick={() => setSnack({ name: "", kcal: "", p: "", unit: "kcal" })} className="text-xs px-3 py-1 rounded-full bg-stone-100 text-stone-600 hover:bg-stone-200">+ Snack</button>
               <button onClick={() => setPlate({ items: [], name: "" })} className="text-xs px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200">Build a plate</button>
             </div>
           </div>
@@ -535,8 +575,14 @@ function Today({ log, saveLog, meals, foods, lego, settings, phase, cycleDay, vi
             </div>
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">Approx. calories</label>
-                <input type="number" inputMode="numeric" value={snack.kcal} onChange={(e) => setSnack({ ...snack, kcal: e.target.value })} placeholder="kcal" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase tracking-wide text-stone-400">Approx. energy</label>
+                  <div className="flex rounded-lg border border-stone-200 overflow-hidden">
+                    {["kcal", "kJ"].map((u) => <button key={u} onClick={() => setSnack({ ...snack, unit: u })} className={`px-2 py-0.5 text-[10px] ${snack.unit === u ? "bg-violet-100 text-violet-700 font-medium" : "text-stone-400"}`}>{u}</button>)}
+                  </div>
+                </div>
+                <input type="number" inputMode="numeric" value={snack.kcal} onChange={(e) => setSnack({ ...snack, kcal: e.target.value })} placeholder={snack.unit === "kJ" ? "kJ" : "kcal"} className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
+                {snack.unit === "kJ" && +snack.kcal > 0 && <p className="text-[10px] text-stone-400 mt-0.5">= {Math.round(+snack.kcal / 4.184)} kcal</p>}
               </div>
               <div className="w-24">
                 <label className="block text-[10px] uppercase tracking-wide text-stone-400 mb-1">Protein</label>
@@ -621,11 +667,14 @@ function Meals(props) {
 function Recipes({ meals, saveMeals, log, saveLog, settings, foods, lego, toggleLegoRecipe }) {
   const [editing, setEditing] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const [showCosts, setShowCosts] = useState(false);
   const cur = settings.currency || "$";
   const legoSet = (lego || { recipes: [] }).recipes || [];
+  const priceOf = (name) => { const f = (foods || []).find((x) => x.name === name); return f ? (+f.price || 0) : null; };
+  const effPrice = (ig) => { const lp = priceOf(ig.name); return lp != null ? lp : (+ig.price || 0); };
   const startNew = () => setEditing({ id: "u" + Date.now(), name: "", servings: 1, steps: "", ing: [blankIng()], isNew: true });
   const editExisting = (m) => setEditing({ ...m, ing: (m.ing || [blankIng()]).map(normIng) });
-  const logIt = (m) => { const ps = calc(m); saveLog({ ...log, entries: [...log.entries, { name: m.name, ...ps, qty: 1, uid: Date.now() + Math.random() }] }); };
+  const logIt = (m) => { const ps = calc(m, priceOf); saveLog({ ...log, entries: [...log.entries, { name: m.name, ...ps, qty: 1, uid: Date.now() + Math.random() }] }); };
   const del = (id) => saveMeals(meals.filter((m) => m.id !== id));
 
   if (editing) return <RecipeEditor recipe={editing} cur={cur} foods={foods} onCancel={() => setEditing(null)} onSave={(r) => {
@@ -634,11 +683,29 @@ function Recipes({ meals, saveMeals, log, saveLog, settings, foods, lego, toggle
     setEditing(null);
   }} />;
 
+  const costRows = [...meals].map((m) => ({ m, c: calc(m, priceOf), missing: (m.ing || []).some((ig) => ig.g != null && !(effPrice(ig) > 0)) })).sort((a, b) => b.c.cost - a.c.cost);
+
   return (
     <div className="space-y-3">
       <button onClick={startNew} className="w-full py-2.5 rounded-2xl bg-violet-200 text-violet-900 text-sm font-medium flex items-center justify-center gap-1 hover:bg-violet-300"><Plus size={16} /> New recipe card</button>
+      {meals.length > 0 && (
+        <button onClick={() => setShowCosts(!showCosts)} className="w-full py-2 rounded-xl border border-stone-200 text-sm text-stone-600 flex items-center justify-center gap-1">{showCosts ? "Hide" : "Show"} cost overview {showCosts ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
+      )}
+      {showCosts && (
+        <div className="bg-white rounded-2xl border border-stone-200 p-3 space-y-0.5">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-wide text-stone-400 px-1 pb-1"><span className="flex-1">Recipe</span><span>Batch</span><span className="w-16 text-right">Per serve</span></div>
+          {costRows.map(({ m, c, missing }) => (
+            <button key={m.id} onClick={() => editExisting(m)} className="w-full flex items-center gap-2 py-1.5 px-1 text-sm hover:bg-stone-50 rounded-lg text-left">
+              <span className="flex-1 truncate">{m.name}{missing && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">price?</span>}</span>
+              <span className="text-stone-400 text-xs">{m.servings}× · {cur}{(c.cost * m.servings).toFixed(2)}</span>
+              <span className="font-medium w-16 text-right">{c.cost > 0 ? `${cur}${c.cost.toFixed(2)}` : "—"}</span>
+            </button>
+          ))}
+          <p className="text-[11px] text-stone-400 px-1 pt-1">Sorted by cost per serve. Tap a recipe to adjust it. "price?" means an ingredient has no price yet — add it on the Ingredients tab and this updates automatically.</p>
+        </div>
+      )}
       {meals.map((m) => {
-        const ps = calc(m); const open = openId === m.id;
+        const ps = calc(m, priceOf); const open = openId === m.id;
         return (
           <div key={m.id} className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
             <button onClick={() => setOpenId(open ? null : m.id)} className="w-full p-3 flex items-center gap-3 text-left">
@@ -682,7 +749,8 @@ function Recipes({ meals, saveMeals, log, saveLog, settings, foods, lego, toggle
 
 function RecipeEditor({ recipe, onSave, onCancel, cur, foods }) {
   const [r, setR] = useState({ ...recipe, ing: recipe.ing.length ? recipe.ing : [blankIng()] });
-  const ps = calc(r);
+  const priceOf = (name) => { const f = (foods || []).find((x) => x.name === name); return f ? (+f.price || 0) : null; };
+  const ps = calc(r, priceOf);
   const setIng = (i, patch) => setR({ ...r, ing: r.ing.map((x, j) => j === i ? { ...x, ...patch } : x) });
   const addIng = () => setR({ ...r, ing: [...r.ing, blankIng()] });
   const delIng = (i) => setR({ ...r, ing: r.ing.filter((_, j) => j !== i) });
@@ -716,7 +784,9 @@ function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
   const [open, setOpen] = useState(false);
   const factor = (+ig.g || 0) / 100;
   const ccal = Math.round((+ig.k || 0) * factor);
-  const ccost = (+ig.price || 0) * (+ig.g || 0) / 1000;
+  const libF = foods.find((x) => x.name === ig.name);
+  const unitPrice = libF ? (+libF.price || 0) : (+ig.price || 0);
+  const ccost = unitPrice * (+ig.g || 0) / 1000;
   const inList = foods.some((x) => x.name === ig.name);
   const pick = (name) => {
     if (name === "__custom") { onChange({ name: "", k: "", p: "", c: "", f: "", fe: "", ca: "" }); setOpen(true); return; }
@@ -738,7 +808,7 @@ function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
         <LabeledNum label="Amount (g)" value={ig.g} onChange={(v) => onChange({ g: v })} w="flex-1" />
       </div>
       <div className="flex items-center justify-between text-xs">
-        <span className="text-stone-400">→ {ccal} kcal{ccost > 0 ? ` · ${cur}${ccost.toFixed(2)}` : ""}{inList && +ig.price > 0 ? ` · ${cur}${(+ig.price).toFixed(2)}/kg` : ""}</span>
+        <span className="text-stone-400">→ {ccal} kcal{ccost > 0 ? ` · ${cur}${ccost.toFixed(2)}` : ""}{inList && unitPrice > 0 ? ` · ${cur}${unitPrice.toFixed(2)}/kg` : ""}</span>
         <button onClick={() => setOpen(!open)} className="text-stone-400 flex items-center gap-1">nutrition / 100 g {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}</button>
       </div>
       {open && <div className="grid grid-cols-3 gap-1.5">{NUT_FIELDS.map(([k, label]) => <LabeledNum key={k} label={label} value={ig[k]} onChange={(v) => onChange({ [k]: v })} />)}</div>}
@@ -750,6 +820,7 @@ function IngredientRow({ ig, onChange, onDelete, cur, foods }) {
 function IngredientDB({ foods, customFoods, saveCustomFoods, cur, legoIngs, toggleLegoIng, hideFood, hideAllBuiltins, unhideAll, hiddenCount }) {
   const [editing, setEditing] = useState(null);
   const [filter, setFilter] = useState("");
+  const [enUnit, setEnUnit] = useState("kcal");
   const legoSet = legoIngs || [];
   const shownBuiltins = foods.filter((f) => f.source === "builtin").length;
   const shown = foods.filter((f) => f.name.toLowerCase().includes(filter.toLowerCase()));
@@ -759,6 +830,9 @@ function IngredientDB({ foods, customFoods, saveCustomFoods, cur, legoIngs, togg
 
   if (editing) {
     const e = editing;
+    const otherFields = NUT_FIELDS.filter(([k]) => k !== "k");
+    const enVal = (e.k === "" || e.k == null) ? "" : (enUnit === "kJ" ? Math.round((+e.k) * 4.184) : e.k);
+    const onEn = (v) => setEditing({ ...e, k: v === "" ? "" : (enUnit === "kJ" ? Math.round((+v / 4.184) * 10) / 10 : +v) });
     return (
       <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
         <div className="flex items-center justify-between"><h2 className="text-base font-medium">{e.isNew ? "New ingredient" : "Edit ingredient"}</h2><button onClick={() => setEditing(null)} className="p-1 text-stone-400"><X size={18} /></button></div>
@@ -767,7 +841,17 @@ function IngredientDB({ foods, customFoods, saveCustomFoods, cur, legoIngs, togg
           <input value={e.name} onChange={(ev) => setEditing({ ...e, name: ev.target.value })} placeholder="e.g. My high-protein yoghurt" className="w-full px-3 py-2 rounded-xl border border-stone-200 text-sm" />
         </div>
         <p className="text-xs text-stone-400">Enter the values per 100 g straight from the nutrition label.</p>
-        <div className="grid grid-cols-3 gap-2">{NUT_FIELDS.map(([k, label]) => <LabeledNum key={k} label={label} value={e[k]} onChange={(v) => setEditing({ ...e, [k]: v })} />)}</div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-[10px] uppercase tracking-wide text-stone-400">Energy / 100 g</label>
+            <div className="flex rounded-lg border border-stone-200 overflow-hidden">
+              {["kcal", "kJ"].map((u) => <button key={u} onClick={() => setEnUnit(u)} className={`px-2.5 py-0.5 text-[11px] ${enUnit === u ? "bg-violet-100 text-violet-700 font-medium" : "text-stone-400"}`}>{u}</button>)}
+            </div>
+          </div>
+          <input type="number" value={enVal} onChange={(ev) => onEn(ev.target.value)} className="w-full px-2 py-1.5 rounded-lg border border-stone-200 text-sm" />
+          <p className="text-[10px] text-stone-400 mt-0.5">{(e.k === "" || e.k == null) ? "Whatever you enter is stored as kcal." : (enUnit === "kJ" ? `Stored as ${Math.round(+e.k)} kcal` : `= ${Math.round((+e.k) * 4.184)} kJ`)}</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2">{otherFields.map(([k, label]) => <LabeledNum key={k} label={label} value={e[k]} onChange={(v) => setEditing({ ...e, [k]: v })} />)}</div>
         <div className="flex items-end gap-2 pt-1">
           <LabeledNum label={`Price (${cur}/kg)`} value={e.price} onChange={(v) => setEditing({ ...e, price: v })} w="w-28" />
           <p className="text-[11px] text-stone-400 pb-2 flex-1">Optional. Set it once here and it carries into every recipe automatically.</p>
