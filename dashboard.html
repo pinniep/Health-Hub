@@ -13,6 +13,9 @@
   body{font-family:'Inter',sans-serif;color:var(--ink);background:var(--paper);line-height:1.45;}
   .app{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:72px;}
   header{padding:16px 16px 6px;}
+  .hrow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+  .topnav{display:flex;gap:13px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.85rem;flex:none;padding-top:4px;}
+  .topnav a{color:var(--blue-deep);text-decoration:none;}
   h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1.4rem;letter-spacing:-.02em;}
   header p{font-size:.8rem;color:var(--stone);margin-top:2px;}
   .modebar{display:flex;gap:10px;align-items:center;padding:10px 14px 4px;position:sticky;top:0;background:var(--paper);z-index:4;}
@@ -48,9 +51,11 @@
   .hint{font-size:.76rem;color:var(--stone);margin-top:8px;line-height:1.5;}
   .msg{font-size:.8rem;margin-top:8px;padding:7px 10px;border-radius:8px;background:var(--peach-soft);color:#9a4f28;}
   .bottomnav{position:fixed;bottom:0;left:0;right:0;max-width:520px;margin:0 auto;display:flex;background:var(--card);border-top:1px solid var(--line);z-index:6;}
-  .navb{flex:1;padding:12px 0 15px;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--stone);}
+  .navb{flex:1;padding:13px 0 17px;background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--stone);}
   .navb.on{color:var(--blue-deep);}
-  .navb svg{width:23px;height:23px;}
+  .navb svg{width:28px;height:28px;}
+  .navb.on{color:var(--blue-deep);}
+  .navb.on svg{filter:drop-shadow(0 1px 0 rgba(74,107,138,.15));}
   .sxrow{display:flex;justify-content:space-between;font-size:.84rem;padding:5px 0;}
   .sxrow .sv{font-family:'IBM Plex Mono',monospace;padding:1px 8px;border-radius:5px;font-size:.74rem;}
   .sv.mild{background:#eef3ee;color:var(--ink-soft);}.sv.moderate{background:var(--peach-soft);color:#9a4f28;}.sv.strong{background:var(--peach);color:#fff;}
@@ -58,7 +63,7 @@
 </head>
 <body>
 <div class="app">
-  <header><h1 id="title">Overview</h1><p id="sub">Your health, at a glance</p></header>
+  <header><div class="hrow"><div><h1 id="title">Overview</h1><p id="sub">Your health, at a glance</p></div><nav class="topnav"><a href="index.html">Home</a><a href="strength.html">Lifts</a><a href="food.html">Food</a></nav></div></header>
   <div class="modebar">
     <div class="seg"><button id="mDay" class="on">Day</button><button id="mWeek">Week</button></div>
     <input id="dt" type="date">
@@ -87,7 +92,7 @@ function computeCycle(D,date){var b=Object.keys(D.ck).filter(function(d){return 
 function fuelData(D,d){var f=foodOf(d);var trained=trainedOn(D,d);var target=trained?D.fs.trainTarget:D.fs.restTarget;return {f:f,trained:trained,target:target};}
 function bar(pct,color){var w=Math.max(0,Math.min(100,Math.round(pct*100)));return '<div class="bar"><span style="width:'+w+'%;background:'+color+'"></span></div>';}
 function weeks(n){var arr=[];var m0=mondayOf(todayISO());for(var w=0;w<n;w++){var start=dayMinus(m0,w*7);var dates=[];for(var i=0;i<7;i++){var dd=dayMinus(start,-i);if(dd<=todayISO())dates.push(dd);}arr.push({start:start,dates:dates,label:(w===0?'This week':w===1?'Last week':fmtDate(start).replace(/^\w+, /,''))});}return arr;}
-function ic(k){var I={overview:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',training:'<path d="M6.5 7v10M17.5 7v10M4 9.5v5M20 9.5v5M6.5 12h11" stroke-linecap="round"/>',fuel:'<path d="M12 3c.5 3 3.5 3.8 3.5 7.5a3.5 3.5 0 0 1-7 0C8.5 8.5 10 8 10.5 6.5c.4 1 1 1.6 1.8 2.1C12.6 6.7 12 5 12 3z" stroke-linejoin="round"/>',recovery:'<path d="M20 14.2A8 8 0 1 1 9.8 4a6.4 6.4 0 0 0 10.2 10.2z" stroke-linejoin="round"/>',cycle:'<path d="M12 3.5s5.5 6 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 9.5 12 3.5 12 3.5z" stroke-linejoin="round"/>'};return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">'+I[k]+'</svg>';}
+function ic(k){var I={overview:'<rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/>',training:'<rect x="10" y="10.3" width="4" height="3.4" rx="1.2"/><rect x="6.8" y="7.8" width="2.8" height="8.4" rx="1.2"/><rect x="14.4" y="7.8" width="2.8" height="8.4" rx="1.2"/><rect x="3.6" y="9.4" width="2.4" height="5.2" rx="1.1"/><rect x="18" y="9.4" width="2.4" height="5.2" rx="1.1"/>',fuel:'<path d="M12.5 2c1.4 3 4 4.2 4 7.8a4.3 4.3 0 0 1-8.6 0c0-2 1.1-3.2 2.2-4.2.3 1.1.9 1.7 1.7 2.2C12.1 6.6 11.5 4.3 12.5 2z"/>',recovery:'<path d="M20.5 14.5A8.2 8.2 0 1 1 9.9 3.8a6.6 6.6 0 0 0 10.6 10.7z"/>',cycle:'<path d="M12 2.6s5.8 6.2 5.8 10.6a5.8 5.8 0 0 1-11.6 0C6.2 8.8 12 2.6 12 2.6z"/>'};return '<svg viewBox="0 0 24 24" fill="currentColor">'+I[k]+'</svg>';}
 
 var TABS=[['overview','Overview','Your health, at a glance'],['training','Training','Lifts + the fuel behind them'],['fuel','Fuel','Calories & protein vs target'],['recovery','Recovery','Sleep, energy & recovery fuel'],['cycle','Cycle','Phase + perimenopause symptoms']];
 var state={tab:'overview',mode:'day'};
