@@ -34,6 +34,14 @@
   .ci-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
   .ci-grid select{padding:9px 7px;font-size:.86rem;}
   .cyc{margin-top:9px;font-size:.82rem;font-family:'IBM Plex Mono',monospace;color:var(--blue-deep);background:var(--blue-soft);border-radius:8px;padding:7px 10px;}
+  .sxwrap{margin-top:12px;}
+  .sxrow{display:flex;flex-wrap:wrap;gap:6px;}
+  .sxchip{font-size:.8rem;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink-soft);cursor:pointer;}
+  .sxchip.on{background:var(--peach-soft);border-color:var(--peach);color:#9a4f28;font-weight:500;}
+  .sevrow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.82rem;padding:6px 0;border-top:1px solid var(--line);}
+  .sxsev{display:flex;gap:4px;flex:none;}
+  .sevb{font-size:.7rem;padding:4px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--stone);cursor:pointer;}
+  .sevb.on{background:var(--peach);color:#fff;border-color:var(--peach);}
   .xc{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:11px;padding:12px 13px;margin-bottom:10px;}
   .xc.flagged{border-left-style:dashed;border-left-color:var(--peach);}
   .xc-h{display:flex;gap:10px;align-items:flex-start;}
@@ -112,6 +120,11 @@
           <div><label>Sleep (hrs)</label><input id="ci-slh" type="number" step="0.5" inputmode="decimal" placeholder="e.g. 7.5"></div>
           <div><label>Sleep quality</label><select id="ci-slq"></select></div>
         </div>
+        <div class="sxwrap">
+          <label>Symptoms today (tap any that apply)</label>
+          <div class="sxrow" id="sxchips"></div>
+          <div id="sxsev"></div>
+        </div>
         <div class="cyc" id="cyc"></div>
       </div>
       <div id="cards"></div>
@@ -129,11 +142,11 @@
       </div>
       <p class="legend">Trend line = <b>estimated strength</b> (weight and reps combined). Higher means stronger, so adding reps shows progress even before you add weight.</p>
       <div id="prog"></div>
-      <div class="mdl" style="margin-top:24px">Programs history — Jun 2026</div>
+      <div class="mdl" style="margin-top:24px">Programs history</div>
       <div class="pcard">
         <div class="nm" style="margin-bottom:6px">Retired exercises — last top set</div>
         <div id="archive"></div>
-        <div class="delta flat" style="margin-top:9px;line-height:1.5">Carried into your current program (history continues on their own cards): incline press · stiff-leg deadlift (was RDL) · leg curl · leg extension · triceps pushdown.</div>
+        <div class="delta flat" style="margin-top:9px;line-height:1.5">Every lift you've dropped from past programs, with the heaviest set you last hit — a ready restart weight if one ever comes back. Lifts still in your current program keep their full history on their own cards.</div>
       </div>
     </section>
 
@@ -167,40 +180,52 @@
 
 <script>
 const PROGRAM=[
- {k:'frontsquat',n:'Front squat (DB)',day:1,mus:'quads · glutes',sets:'4×8',rest:'90s',main:true},
- {k:'rdl',n:'Stiff-leg deadlift',day:1,mus:'hamstrings · glutes',sets:'4×8',rest:'90s',main:true},
+ {k:'legpress',n:'Leg press',day:1,mus:'quads · glutes',sets:'4×8',rest:'90s',main:true},
+ {k:'hipthrust',n:'Hip thrust',day:1,mus:'glutes · hamstrings',sets:'4×8',rest:'90s',main:true},
  {k:'legcurl',n:'Leg curl',day:1,mus:'hamstrings',sets:'4×8',rest:'45s'},
- {k:'legext',n:'Leg extension',day:1,mus:'quads',sets:'4×8 +drop',rest:'45s'},
- {k:'militarypress',n:'Military press',day:1,mus:'front delts',sets:'4×8',rest:'90s',main:true},
- {k:'uprightrow',n:'Upright row',day:1,mus:'shoulders · upper back',sets:'4×8',rest:'30s'},
- {k:'ohp',n:'Overhead press (DB)',day:1,mus:'front delts',sets:'4×8',rest:'30s'},
+ {k:'legext',n:'Leg extension',day:1,mus:'quads',sets:'5×8–12',rest:'45s'},
+ {k:'shoulder',n:'Shoulder press (machine)',day:1,mus:'front delts',sets:'4×8',rest:'90s',main:true},
+ {k:'facepull',n:'Face pull',day:1,mus:'rear delts · upper back',sets:'4×8',rest:'30s'},
+ {k:'ohp',n:'Overhead press (DB)',day:1,mus:'front delts',sets:'5×8–12',rest:'30s'},
  {k:'situp',n:'Sit-up',day:1,mus:'core',sets:'2×20',rest:'30s'},
- {k:'incline',n:'Incline press',day:2,mus:'chest · front delts',sets:'4×8',rest:'90s',main:true},
- {k:'chestfly',n:'Chest fly',day:2,mus:'chest',sets:'4×8',rest:'30s'},
+ {k:'inclinedb',n:'Incline press (DB)',day:2,mus:'chest · front delts',sets:'4×8',rest:'90s',main:true},
  {k:'cgbench',n:'Close-grip bench',day:2,mus:'chest · triceps',sets:'4×8',rest:'45s'},
- {k:'chestpress',n:'Chest press (machine)',day:2,mus:'chest',sets:'4×8 +drop',rest:'30s'},
- {k:'frenchpress',n:'French press',day:2,mus:'triceps',sets:'4×8',rest:'30s'},
+ {k:'chestfly',n:'Chest fly',day:2,mus:'chest',sets:'4×8',rest:'30s'},
+ {k:'chestpress',n:'Chest press (machine)',day:2,mus:'chest',sets:'5×8–12',rest:'30s'},
+ {k:'dips',n:'Triceps dips',day:2,mus:'triceps',sets:'4×8',rest:'45s'},
  {k:'pushdown',n:'Triceps pushdown',day:2,mus:'triceps',sets:'4×8',rest:'30s'},
- {k:'singlearmext',n:'Single-arm extension',day:2,mus:'triceps',sets:'10-8-6-4-2',rest:'10s'},
- {k:'trunkrot',n:'Trunk rotation',day:2,mus:'core',sets:'2×10',rest:'30s'},
+ {k:'frenchpress',n:'French press',day:2,mus:'triceps',sets:'5×2–10',rest:'30s'},
+ {k:'crunchw',n:'Crunch (weighted)',day:2,mus:'core',sets:'2×20',rest:'30s'},
  {k:'plank',n:'Elbow plank',day:2,mus:'core',sets:'2×30s',rest:'30s'},
  {k:'singlearmrow',n:'Single-arm row (DB)',day:3,mus:'lats · upper back',sets:'4×8',rest:'45s',main:true},
- {k:'highpull',n:'Pulldown (high pulley)',day:3,mus:'lats',sets:'4×8',rest:'30s'},
+ {k:'pulldownm',n:'Pulldown (machine)',day:3,mus:'lats',sets:'4×8',rest:'30s'},
  {k:'tripull',n:'Pulldown (triangle)',day:3,mus:'lats',sets:'4×8',rest:'45s'},
- {k:'lowrow',n:'Low row',day:3,mus:'lats · upper back',sets:'4×8 +drop',rest:'90s',main:true},
- {k:'bbcurl',n:'Barbell curl',day:3,mus:'biceps',sets:'4×8',rest:'45s',main:true},
+ {k:'row',n:'Row (triangle, upright)',day:3,mus:'lats · upper back',sets:'5×8–12',rest:'90s',main:true},
+ {k:'armcurl',n:'Arm curl (machine)',day:3,mus:'biceps',sets:'4×8',rest:'45s',main:true},
  {k:'altcurl',n:'Alt. DB curl',day:3,mus:'biceps',sets:'4×8',rest:'30s'},
- {k:'cablecurl',n:'Cable curl',day:3,mus:'biceps',sets:'4×8 +drop',rest:'30s'},
+ {k:'cablecurl',n:'Cable curl',day:3,mus:'biceps',sets:'5×8–12',rest:'30s'},
  {k:'crunch',n:'Crunch',day:3,mus:'core',sets:'2×20',rest:'30s'},
  {k:'revcrunch',n:'Reverse crunch',day:3,mus:'core',sets:'2×20',rest:'30s'}
 ];
-const ARCHIVE={goblet:'Goblet squat',pulldown:'Lat pulldown (wide bar)',flatpress:'Flat press',row:'Cable row (triangle)',shoulder:'Shoulder press',revfly:'Reverse fly',hammer:'Hammer curl',birddog:'Bird dog'};
+const ARCHIVE={goblet:'Goblet squat',pulldown:'Lat pulldown (wide bar)',flatpress:'Flat press',revfly:'Reverse fly',hammer:'Hammer curl',birddog:'Bird dog',frontsquat:'Front squat',rdl:'Stiff-leg deadlift / RDL',militarypress:'Military press',uprightrow:'Upright row',incline:'Incline press (barbell)',singlearmext:'Single-arm ext',trunkrot:'Trunk rotation',highpull:'Pulldown (high pulley)',lowrow:'Low row',bbcurl:'Barbell curl'};
 const NAME=Object.fromEntries(PROGRAM.map(function(e){return [e.k,e.n];}));
 Object.keys(ARCHIVE).forEach(function(k){NAME[k]=ARCHIVE[k];});
-const SAVER={ohp:1,uprightrow:1,legext:1,singlearmext:1,chestpress:1,chestfly:1,altcurl:1,cablecurl:1,highpull:1};
-const MMAP={frontsquat:{p:['quads','glutes'],s:['core']},rdl:{p:['hamstrings','glutes'],s:['lowerback','core']},legcurl:{p:['hamstrings'],s:[]},legext:{p:['quads'],s:[]},militarypress:{p:['delts'],s:['triceps','upperback']},uprightrow:{p:['delts','upperback'],s:['biceps']},ohp:{p:['delts'],s:['triceps']},situp:{p:['core'],s:[]},incline:{p:['chest','delts'],s:['triceps']},chestfly:{p:['chest'],s:['delts']},cgbench:{p:['chest','triceps'],s:['delts']},chestpress:{p:['chest'],s:['delts','triceps']},frenchpress:{p:['triceps'],s:[]},pushdown:{p:['triceps'],s:[]},singlearmext:{p:['triceps'],s:[]},trunkrot:{p:['core'],s:[]},plank:{p:['core'],s:['lowerback']},singlearmrow:{p:['lats','upperback'],s:['biceps']},highpull:{p:['lats'],s:['upperback','biceps']},tripull:{p:['lats'],s:['biceps']},lowrow:{p:['lats','upperback'],s:['biceps','reardelts']},bbcurl:{p:['biceps'],s:['forearms']},altcurl:{p:['biceps'],s:['forearms']},cablecurl:{p:['biceps'],s:[]},crunch:{p:['core'],s:[]},revcrunch:{p:['core'],s:[]}};
+const SAVER={ohp:1,legext:1,chestfly:1,pushdown:1,altcurl:1,cablecurl:1,pulldownm:1};
+const MMAP={legpress:{p:['quads','glutes'],s:[]},hipthrust:{p:['glutes','hamstrings'],s:[]},legcurl:{p:['hamstrings'],s:[]},legext:{p:['quads'],s:[]},shoulder:{p:['delts'],s:['triceps']},facepull:{p:['reardelts','upperback'],s:[]},ohp:{p:['delts'],s:['triceps']},situp:{p:['core'],s:[]},inclinedb:{p:['chest','delts'],s:['triceps']},cgbench:{p:['chest','triceps'],s:['delts']},chestfly:{p:['chest'],s:['delts']},chestpress:{p:['chest'],s:['delts','triceps']},dips:{p:['triceps'],s:['chest']},pushdown:{p:['triceps'],s:[]},frenchpress:{p:['triceps'],s:[]},crunchw:{p:['core'],s:[]},plank:{p:['core'],s:['lowerback']},singlearmrow:{p:['lats','upperback'],s:['biceps']},pulldownm:{p:['lats'],s:['biceps']},tripull:{p:['lats'],s:['biceps']},row:{p:['lats','upperback'],s:['biceps','reardelts']},armcurl:{p:['biceps'],s:[]},altcurl:{p:['biceps'],s:['forearms']},cablecurl:{p:['biceps'],s:[]},crunch:{p:['core'],s:[]},revcrunch:{p:['core'],s:[]}};
 const LBL={chest:'chest',delts:'front shoulders',biceps:'biceps',forearms:'forearms',core:'core',quads:'quads',upperback:'upper back',reardelts:'rear shoulders',lats:'lats',triceps:'triceps',lowerback:'lower back',glutes:'glutes',hamstrings:'hamstrings'};
 const FEEL=['—','Rough','OK','Good','Strong'],EN=['—','Low','Medium','High'],BL=['—','Bleeding','No'],SLQ=['—','Poor','OK','Good'];
+const SX=[['flush','Hot flush'],['sweat','Night sweat'],['palp','Palpitations'],['woke','Woke in night'],['resettle','Hard to resettle'],['mood','Low mood'],['fog','Brain fog'],['head','Headache'],['cramp','Cramps']];
+const SXNAME=Object.fromEntries(SX);const SEV=['mild','moderate','strong'];
+var draftSx={};
+function renderSx(){
+ var chips=document.getElementById('sxchips');if(!chips)return;
+ chips.innerHTML=SX.map(function(s){return '<button class="sxchip'+(draftSx[s[0]]?' on':'')+'" onclick="toggleSx(\''+s[0]+'\')">'+s[1]+'</button>';}).join('');
+ document.getElementById('sxsev').innerHTML=SX.filter(function(s){return draftSx[s[0]];}).map(function(s){
+   return '<div class="sevrow"><span>'+s[1]+'</span><span class="sxsev">'+SEV.map(function(v){return '<button class="sevb'+(draftSx[s[0]]===v?' on':'')+'" onclick="setSev(\''+s[0]+'\',\''+v+'\')">'+v+'</button>';}).join('')+'</span></div>';
+ }).join('');
+}
+function toggleSx(k){if(draftSx[k])delete draftSx[k];else draftSx[k]='mild';renderSx();}
+function setSev(k,v){draftSx[k]=v;renderSx();}
 
 const STRUCT=[['circle',{cx:100,cy:50,r:14}],['rect',{x:93,y:62,width:14,height:9,rx:3}],['circle',{cx:58,cy:176,r:6}],['circle',{cx:142,cy:176,r:6}],['rect',{x:80,y:182,width:40,height:22,rx:6}],['rect',{x:82,y:288,width:14,height:58,rx:6}],['rect',{x:104,y:288,width:14,height:58,rx:6}],['circle',{cx:280,cy:50,r:14}],['rect',{x:273,y:62,width:14,height:9,rx:3}],['circle',{cx:238,cy:176,r:6}],['circle',{cx:322,cy:176,r:6}],['ellipse',{cx:240,cy:152,rx:7,ry:19}],['ellipse',{cx:320,cy:152,rx:7,ry:19}],['rect',{x:262,y:290,width:14,height:56,rx:6}],['rect',{x:284,y:290,width:14,height:56,rx:6}]];
 const MUS={delts:[['ellipse',{cx:74,cy:84,rx:12,ry:11}],['ellipse',{cx:126,cy:84,rx:12,ry:11}]],biceps:[['ellipse',{cx:64,cy:112,rx:8,ry:20}],['ellipse',{cx:136,cy:112,rx:8,ry:20}]],forearms:[['ellipse',{cx:60,cy:152,rx:7,ry:19}],['ellipse',{cx:140,cy:152,rx:7,ry:19}]],chest:[['rect',{x:80,y:80,width:19,height:34,rx:6}],['rect',{x:101,y:80,width:19,height:34,rx:6}]],core:[['rect',{x:83,y:116,width:34,height:66,rx:8}]],quads:[['ellipse',{cx:89,cy:246,rx:13,ry:40}],['ellipse',{cx:111,cy:246,rx:13,ry:40}]],upperback:[['rect',{x:261,y:78,width:38,height:30,rx:7}]],reardelts:[['ellipse',{cx:254,cy:84,rx:12,ry:11}],['ellipse',{cx:306,cy:84,rx:12,ry:11}]],triceps:[['ellipse',{cx:244,cy:114,rx:8,ry:20}],['ellipse',{cx:316,cy:114,rx:8,ry:20}]],lats:[['ellipse',{cx:265,cy:130,rx:10,ry:26}],['ellipse',{cx:295,cy:130,rx:10,ry:26}]],lowerback:[['rect',{x:268,y:152,width:24,height:30,rx:6}]],glutes:[['ellipse',{cx:270,cy:200,rx:13,ry:15}],['ellipse',{cx:290,cy:200,rx:13,ry:15}]],hamstrings:[['ellipse',{cx:269,cy:250,rx:13,ry:38}],['ellipse',{cx:291,cy:250,rx:13,ry:38}]]};
@@ -299,6 +324,7 @@ function renderCheckin(){
  fillSel(document.getElementById('ci-bl'),BL,ci.bleed||'—');
  fillSel(document.getElementById('ci-slq'),SLQ,ci.sleepQ||'—');
  document.getElementById('ci-slh').value=(ci.sleepH!=null?ci.sleepH:'');
+ draftSx=(ci.sx&&typeof ci.sx==='object')?Object.assign({},ci.sx):{};renderSx();
  renderCyc();
 }
 function renderCyc(){
@@ -357,6 +383,7 @@ document.getElementById('save').onclick=async function(){
  var freshC=getJSON(K_C,{});
  var sessionWtMin=(checkins[d]&&checkins[d].wtMin);
  freshC[d]=Object.assign({},freshC[d]||{},{feeling:document.getElementById('ci-feel').value,energy:document.getElementById('ci-en').value,bleed:(document.getElementById('ci-bl').value==='—'?'':document.getElementById('ci-bl').value),sleepQ:(document.getElementById('ci-slq').value==='—'?'':document.getElementById('ci-slq').value),sleepH:(function(){var h=parseFloat(document.getElementById('ci-slh').value);return isNaN(h)?null:h;})()});
+ if(Object.keys(draftSx).length)freshC[d].sx=Object.assign({},draftSx);else delete freshC[d].sx;
  if(sessionWtMin!=null&&sessionWtMin!=='')freshC[d].wtMin=sessionWtMin;
  checkins=freshC;
  if(curDay==='other'){
